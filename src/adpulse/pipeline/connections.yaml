@@ -1,0 +1,71 @@
+# Airbyte connections: source connector -> streams -> ClickHouse raw tables.
+#
+# `demo` uses the official Airbyte File source (source-file) on the demo CSVs, so the
+# exact same pipeline code runs for demo and real data. To go live, enable a real
+# connector block below, fill its config from env vars (${VAR}) and map its streams.
+#
+# Same mapping is used by the full Airbyte OSS deployment (see docs/airbyte-oss.md).
+
+demo:
+  connector: source-file
+  streams:
+    - {file: meta_ads_insights.csv,          table: raw_meta_ads_insights,          source: meta_ads}
+    - {file: google_ads_ad_performance.csv,  table: raw_google_ads_ad_performance,  source: google_ads}
+    - {file: google_ads_search_terms.csv,    table: raw_google_ads_search_terms,    source: google_ads}
+    - {file: ga4_sessions.csv,               table: raw_ga4_sessions,               source: ga4}
+    - {file: shop_orders.csv,                table: raw_shop_orders,                source: shopify}
+    - {file: shop_customers.csv,             table: raw_shop_customers,             source: shopify}
+
+# ---- Real connectors (disabled until credentials are provided) ----
+live:
+  - name: meta_ads
+    enabled: false
+    connector: source-facebook-marketing
+    config:
+      account_ids: ["${META_AD_ACCOUNT_ID}"]
+      access_token: "${META_ACCESS_TOKEN}"
+      start_date: "2026-01-01T00:00:00Z"
+    streams:
+      ads_insights:
+        table: raw_meta_ads_insights
+        columns: {date_start: date, account_id: account_id, campaign_id: campaign_id,
+                  campaign_name: campaign_name, adset_id: adset_id, adset_name: adset_name,
+                  ad_id: ad_id, ad_name: ad_name, impressions: impressions, clicks: clicks, spend: spend}
+  - name: google_ads
+    enabled: false
+    connector: source-google-ads
+    config:
+      customer_id: "${GOOGLE_ADS_CUSTOMER_ID}"
+      start_date: "2026-01-01"
+      credentials:
+        developer_token: "${GOOGLE_ADS_DEVELOPER_TOKEN}"
+        client_id: "${GOOGLE_ADS_CLIENT_ID}"
+        client_secret: "${GOOGLE_ADS_CLIENT_SECRET}"
+        refresh_token: "${GOOGLE_ADS_REFRESH_TOKEN}"
+    streams:
+      ad_group_ad_legacy:
+        table: raw_google_ads_ad_performance
+        columns: {segments.date: date, campaign.id: campaign_id, campaign.name: campaign_name,
+                  ad_group.id: ad_group_id, ad_group.name: ad_group_name, ad_group_ad.ad.id: ad_id,
+                  ad_group_ad.ad.name: ad_name, metrics.impressions: impressions, metrics.clicks: clicks,
+                  metrics.cost_micros: cost_micros, metrics.conversions: conversions}
+      search_term_view:
+        table: raw_google_ads_search_terms
+        columns: {segments.date: date, campaign.id: campaign_id, campaign.name: campaign_name,
+                  ad_group.id: ad_group_id, ad_group.name: ad_group_name,
+                  search_term_view.search_term: search_term, metrics.impressions: impressions,
+                  metrics.clicks: clicks, metrics.cost_micros: cost_micros, metrics.conversions: conversions,
+                  metrics.conversions_value: conversions_value}
+  - name: shopify
+    enabled: false
+    connector: source-shopify
+    config:
+      shop: "${SHOPIFY_SHOP}"
+      credentials: {auth_method: api_password, api_password: "${SHOPIFY_API_PASSWORD}"}
+      start_date: "2026-01-01"
+    streams:
+      orders:
+        table: raw_shop_orders
+        columns: {id: order_id, customer.id: customer_id, note_attributes.session_id: session_id,
+                  created_at: created_at, subtotal_price: subtotal, total_discounts: discount,
+                  total_price: total, currency: currency, financial_status: status}

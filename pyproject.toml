@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adpulse"
+version = "0.1.0"
+description = "AdPulse - marketing data agent on a ClickHouse warehouse: ads -> clicks -> sales -> LTV, answered in plain English with verified numbers."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "clickhouse-connect>=0.8",
+  "anthropic>=0.40",
+  "openai>=1.50",
+  "streamlit>=1.40",
+  "pandas>=2.0",
+  "numpy>=1.26",
+  "plotly>=5.20",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "typer>=0.12",
+  "rich>=13",
+  "slack_sdk>=3.27",
+  "sqlglot>=25",
+  "python-dotenv>=1.0",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+airbyte = ["airbyte>=0.20"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+adpulse = "adpulse.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+adpulse = ["sql/*.sql", "sql/models/*.sql", "agent/*.yaml", "pipeline/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs a running ClickHouse"]
+
+[tool.ruff]
+line-length = 110

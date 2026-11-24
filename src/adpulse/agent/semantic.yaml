@@ -1,0 +1,129 @@
+# Semantic layer: what the agent knows about the warehouse beyond column names.
+# Only tables listed here are queryable by the agent (enforced by the SQL guard).
+
+tables:
+  dim_ads:
+    grain: one row per ad (platform + ad_id)
+    description: Ad catalog across Meta and Google with campaign and ad group names.
+    columns:
+      platform: "'meta' or 'google'"
+      campaign_type: "social | search | shopping | performance_max"
+      first_active_date: first day the ad had spend
+      last_active_date: last day the ad had spend (ads can be paused/stopped)
+
+  fct_ad_daily:
+    grain: one row per ad per day
+    description: Delivery and spend from the ad platforms, in USD.
+    columns:
+      spend: USD spent that day
+      platform_conversions: conversions the AD PLATFORM claims (inflated, view-through). Never use as truth.
+
+  fct_sessions:
+    grain: one row per web session (GA4)
+    description: Web sessions with the paid source resolved from UTM tags.
+    columns:
+      platform: "'meta' | 'google' for paid clicks, 'unpaid' otherwise"
+      ad_id: ad that generated the click ('' for unpaid)
+      channel: "paid | organic | direct | email"
+
+  fct_orders:
+    grain: one row per paid (non-refunded) order
+    description: Orders with last-click attribution to the session that placed them.
+    columns:
+      revenue: order total in USD after discounts
+      customer_order_number: 1 for the customer's first order, 2 for the second...
+      is_first_order: 1 if this order acquired the customer
+      platform: "attributed platform for THIS order ('unpaid' if not from an ad click)"
+      ad_id: attributed ad for THIS order ('' if unpaid)
+
+  dim_customers:
+    grain: one row per customer
+    description: >
+      Customer acquisition source (the ad behind their FIRST order) and lifetime value.
+      Use this table for anything about LTV, cohorts, or which ads bring valuable customers.
+    columns:
+      acquisition_month: first day of the month of the first order (cohort)
+      acquisition_platform: "'meta' | 'google' | 'unpaid'"
+      acquisition_ad_id: ad that acquired the customer ('' if unpaid) -> join dim_ads on (platform, ad_id)
+      ltv: total revenue from this customer to date (USD)
+      ltv_90d: revenue in the first 90 days after the first order (fair comparison across cohorts)
+      customer_age_days: days since first order (young cohorts have had less time to repurchase)
+
+  mart_ad_monthly:
+    grain: one row per ad per calendar month
+    description: >
+      Pre-joined monthly scorecard: spend -> clicks -> new customers -> revenue -> LTV.
+      Fastest way to answer most "which ad" questions for whole months.
+    columns:
+      new_customers: customers whose first order was attributed to this ad in this month
+      cohort_ltv: lifetime revenue to date of those new customers
+      avg_ltv: cohort_ltv / new_customers
+      cac: spend / new_customers
+      attributed_revenue: revenue of ALL orders (new + repeat) last-click attributed to this ad this month
+      roas: attributed_revenue / spend
+      ltv_roas: cohort_ltv / spend (long-term return of the customers this ad bought)
+
+  fct_search_terms:
+    grain: one row per Google search term per ad group per day
+    description: What people actually typed before clicking a Google search ad.
+    columns:
+      cost: USD
+      conversions: Google-reported conversions
+
+metrics:
+  spend: sum(fct_ad_daily.spend)
+  new_customers: count of dim_customers by acquisition_* (or mart_ad_monthly.new_customers)
+  CAC: spend / new_customers for the same ad(s) and period
+  LTV: dim_customers.ltv (lifetime revenue per customer); "average LTV" = avg(ltv) over the customers
+  LTV_to_CAC: avg LTV / CAC
+  ROAS: attributed revenue / spend
+  CTR: clicks / impressions
+  CPC: spend / clicks
+  conversion_rate: new customers / clicks
+
+joins:
+  - "dim_customers.acquisition_ad_id = dim_ads.ad_id AND dim_customers.acquisition_platform = dim_ads.platform"
+  - "fct_orders.ad_id = dim_ads.ad_id AND fct_orders.platform = dim_ads.platform"
+  - "fct_ad_daily.ad_id = dim_ads.ad_id AND fct_ad_daily.platform = dim_ads.platform"
+  - "fct_orders.customer_id = dim_customers.customer_id"
+
+rules:
+  - "'Last month' means the previous full calendar month relative to TODAY; 'this month' is month-to-date."
+  - "Customers 'brought by an ad' are attributed by their FIRST order (dim_customers.acquisition_*)."
+  - "Aggregate spend and customers in SEPARATE subqueries/CTEs, then join on ad. Joining spend rows to customer rows multiplies spend (fan-out)."
+  - "Guard divisions with nullIf(x, 0)."
+  - "Always return ad_name and campaign_name (from dim_ads) next to ad ids, and round money to 2 decimals."
+  - "Return the numbers the answer needs (spend, customers, LTV, CAC...) as columns: the narrative may only quote numbers that appear in the result."
+  - "For 'best/worst' questions on small samples, include new_customers so small-sample winners are visible; prefer HAVING new_customers >= 5."
+  - "Give EVERY selected expression an explicit alias (d.ad_name AS ad_name): ClickHouse otherwise names the column 'd.ad_name'."
+  - "Platform-reported conversions are not ground truth; use warehouse orders."
+
+examples:
+  - question: Which ads brought customers with the highest LTV last month?
+    sql: |
+      WITH cust AS (
+          SELECT acquisition_platform AS platform, acquisition_ad_id AS ad_id,
+                 count() AS new_customers, round(avg(ltv), 2) AS avg_customer_ltv,
+                 round(sum(ltv), 2) AS total_customer_ltv
+          FROM dim_customers
+          WHERE acquisition_month = toStartOfMonth(today() - INTERVAL 1 MONTH)
+            AND acquisition_platform != 'unpaid'
+          GROUP BY platform, ad_id
+      ),
+      sp AS (
+          SELECT platform, ad_id, round(sum(spend), 2) AS ad_spend
+          FROM fct_ad_daily
+          WHERE toStartOfMonth(date) = toStartOfMonth(today() - INTERVAL 1 MONTH)
+          GROUP BY platform, ad_id
+      )
+      SELECT d.ad_name AS ad_name, d.campaign_name AS campaign_name, c.platform AS platform,
+             c.new_customers AS new_customers, c.avg_customer_ltv AS avg_customer_ltv,
+             c.total_customer_ltv AS total_customer_ltv, s.ad_spend AS ad_spend,
+             round(s.ad_spend / nullIf(c.new_customers, 0), 2) AS cac,
+             round(c.avg_customer_ltv / nullIf(s.ad_spend / nullIf(c.new_customers, 0), 0), 2) AS ltv_to_cac
+      FROM cust c
+      LEFT JOIN sp s ON s.platform = c.platform AND s.ad_id = c.ad_id
+      LEFT JOIN dim_ads d ON d.platform = c.platform AND d.ad_id = c.ad_id
+      WHERE c.new_customers >= 5
+      ORDER BY c.avg_customer_ltv DESC
+      LIMIT 10
