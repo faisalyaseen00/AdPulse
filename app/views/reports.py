@@ -44,6 +44,10 @@ send_slack = b1.button("Send to Slack", type="primary", icon=":material/send:", 
                                                             "app settings to turn this on.")
 send_mail = b2.button("Send by email", icon=":material/mail:", width="stretch", disabled=not s.email_configured,
                       help=None if s.email_configured else "Email isn't set up yet (needs a Gmail app password).")
+if not s.email_configured:
+    b2.caption("Email is off until a Gmail app password is added (scripts/setup_email.sh).")
+if not s.slack_configured:
+    b1.caption("Slack is off until a Slack webhook is added to the app settings.")
 b3.download_button("Download report", weekly.to_markdown(rep), f"adpulse_weekly_{rep.period_end}.md",
                    icon=":material/download:", width="stretch")
 if send_slack or send_mail:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-st.set_page_config(page_title="AdPulse", page_icon=str(Path(__file__).parent / "assets" / "icon.svg"), layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AdPulse", page_icon=str(Path(__file__).parent / "assets" / "icon.svg"), layout="wide", initial_sidebar_state="auto")
 
 
 

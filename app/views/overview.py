@@ -12,9 +12,9 @@ from adpulse.config import get_settings
 if not ui.require_warehouse():
     st.stop()
 
-top_l, top_r = st.columns([3, 2], vertical_alignment="center")
-window = top_r.segmented_control("Period", [7, 30, 90], default=30, format_func=lambda d: f"{d} days",
-                                 label_visibility="collapsed") or 30
+# own row, so all three choices always fit (they were clipped when squeezed into a column)
+window = st.segmented_control("Period", [7, 30, 90], default=30, format_func=lambda d: f"Last {d} days",
+                              label_visibility="collapsed", key="period") or 30
 
 k = ui.q(
     """
@@ -43,24 +43,43 @@ roas, roas_p = (k.rev / k.spend if k.spend else 0), (k.rev_p / k.spend_p if k.sp
 cac, cac_p = (k.spend / k.cust if k.cust else 0), (k.spend_p / k.cust_p if k.cust_p else 0)
 end = pd.Timestamp(k.end_date)
 period = "before"
-top_l.caption(f"Showing the last {window} days, up to {end:%B %-d, %Y}, compared with the {window} days before.")
 
-# ---- The verdict: one sentence a boss can read in three seconds -----------------------------------------
+# ---- The stage: the answer in three seconds, with the trend drawing itself beside it ------------------
 if roas >= 1.5:
-    tail = ", a healthy return"
+    after = "back for every $1 you spent. A healthy return."
 elif roas >= 1:
-    tail = ", so ads are paying for themselves"
+    after = "back for every $1 you spent. Ads are paying for themselves."
 else:
-    tail = ", less than they cost"
+    after = "back for every $1 you spent. Less than they cost."
 rev_change = chg(k.rev, k.rev_p)
-more = (f"You spent <b>{ui.money(k.spend)}</b> on ads and won <b>{k.cust:,.0f} new customers</b> at "
-        f"<b>{ui.money(cac, 2)}</b> each. ")
+detail = (f"You spent <b>{ui.money(k.spend)}</b> and won <b>{k.cust:,.0f} new customers</b> at "
+          f"<b>{ui.money(cac, 2)}</b> each. ")
 if k.ltv90 and not pd.isna(k.ltv90) and cac:
-    more += (f"A new customer spends about <b>{ui.money(k.ltv90, 2)}</b> in their first 90 days, "
-             f"so each one is worth <b>{plain.times(k.ltv90 / cac)}</b> what it cost to win them. ")
+    detail += (f"Each is worth about <b>{ui.money(k.ltv90, 2)}</b> in their first 90 days, "
+               f"<b>{plain.times(k.ltv90 / cac)}</b> what it cost to win them. ")
 if rev_change is not None:
-    more += f"Sales from ads: {ui.change_text(rev_change, 'up', period)}."
-ui.verdict(f"Your ads brought back <b>{plain.per_dollar(roas)}</b> for every $1 you spent{tail}.", more)
+    detail += f"Sales from ads {ui.change_text(rev_change, 'up', 'the ' + str(window) + ' days before')}."
+
+wk = ui.q("""
+    SELECT toStartOfWeek(d.date, 1) AS week, round(sum(d.spend), 2) AS spend,
+           round(any(r.revenue), 2) AS revenue
+    FROM fct_ad_daily d
+    LEFT JOIN (SELECT toStartOfWeek(order_date, 1) AS week, sum(revenue) AS revenue FROM fct_orders
+               WHERE platform != 'unpaid' GROUP BY week) r ON r.week = toStartOfWeek(d.date, 1)
+    GROUP BY week ORDER BY week
+""")
+wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
+recent = wk.tail(26)
+ui.stage(
+    eyebrow=f"Last {window} days, up to {end:%B %-d, %Y}",
+    lead="Your ads brought back", big=plain.per_dollar(roas), after=after, detail_html=detail,
+    spark_svg=ui.sparkline(recent.revenue.astype(float).tolist(), recent.spend.astype(float).tolist()),
+    legend=[("Sales from ads, weekly", "linear-gradient(90deg,#2DD4BF,#F4B400,#FF8A5B)"),
+            ("Ad spend", "rgba(255,255,255,.45)")],
+    mini=[(ui.money(recent.revenue.iloc[-1]), "sales last full week"),
+          (ui.money(recent.spend.iloc[-1]), "spent last full week"),
+          (f"{len(recent)} weeks", "shown in the line")],
+)
 
 # ---- Numbers at a glance --------------------------------------------------------------------------------
 ui.kpi_row([
@@ -135,15 +154,6 @@ st.html('<div class="ap-flow">' + "".join(
 # ---- Charts ---------------------------------------------------------------------------------------------
 c1, c2 = st.columns([3, 2])
 with c1:
-    wk = ui.q("""
-        SELECT toStartOfWeek(d.date, 1) AS week, round(sum(d.spend), 2) AS spend,
-               round(any(r.revenue), 2) AS revenue
-        FROM fct_ad_daily d
-        LEFT JOIN (SELECT toStartOfWeek(order_date, 1) AS week, sum(revenue) AS revenue FROM fct_orders
-                   WHERE platform != 'unpaid' GROUP BY week) r ON r.week = toStartOfWeek(d.date, 1)
-        GROUP BY week ORDER BY week
-    """)
-    wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=wk.week, y=wk.revenue, name="Sales from ads", mode="lines",
                              line={"color": ui.SERIES[1], "width": 2.5}, hovertemplate="$%{y:,.0f}"))

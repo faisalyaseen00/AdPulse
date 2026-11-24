@@ -28,3 +28,21 @@ def test_friendly_column_names(raw, nice):
 
 def test_dollar_signs_never_become_math():
     assert ui.md("spent $10 and $20") == "spent \\$10 and \\$20"
+
+
+def test_sparkline_draws_and_is_one_line():
+    svg = ui.sparkline([10, 14, 9, 20, 18], [8, 9, 9, 12, 11])
+    assert svg.startswith("<svg") and svg.endswith("</svg>")
+    assert "\n" not in svg  # st.markdown would turn indented/blank lines into code blocks
+    assert svg.count('class="line') == 2 and 'pathLength="1"' in svg and "ping" in svg
+    assert ui.sparkline([5]) == ""  # not enough points: no chart rather than a broken one
+
+
+def test_menu_button_is_never_hidden():
+    # the open-menu button lives inside stToolbar; hiding the toolbar strands phone users
+    assert '[data-testid="stToolbar"]' not in ui.CSS.split("hide only the actions")[-1].split("}")[0]
+    assert "display: none" not in [rule for rule in ui.CSS.split("}") if 'data-testid="stToolbar"]' in rule][:1]
+
+
+def test_motion_respects_reduced_motion_setting():
+    assert "prefers-reduced-motion" in ui.CSS and ".ap-spark .line { stroke-dashoffset: 0; }" in ui.CSS

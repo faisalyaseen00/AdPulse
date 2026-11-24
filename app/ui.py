@@ -35,7 +35,8 @@ h1, h2, h3, h4 { font-family: var(--display); color: var(--ink); letter-spacing:
 .stMarkdown p, .stMarkdown li { font-size: 1rem; line-height: 1.6; color: var(--ink-2); }
 #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; height: 0; }
 /* hosting toolbar (Fork / GitHub / deploy buttons) is noise for business readers */
-[data-testid="stToolbar"], [data-testid="stToolbarActions"], .stAppDeployButton { display: none !important; }
+/* hide only the actions (Fork, GitHub, deploy). Never the toolbar itself: it holds the open-menu button */
+[data-testid="stToolbarActions"], .stAppDeployButton { display: none !important; }
 header[data-testid="stHeader"] { background: transparent; }
 :focus-visible { outline: 2px solid var(--pulse) !important; outline-offset: 2px; }
 
@@ -53,20 +54,63 @@ header[data-testid="stHeader"] { background: transparent; }
 .ap-status .dot.good { background: var(--good); } .ap-status .dot.info { background: var(--ink); }
 .ap-status .dot.warn { background: var(--pulse); } .ap-status .dot.bad { background: var(--bad); }
 
-/* Page header: quiet, left aligned */
-.ap-head { margin: 0 0 1.4rem; max-width: 760px; }
-.ap-head h1 { font-size: 2rem; font-weight: 750; margin: 0; padding: 0; line-height: 1.15; }
-.ap-head p { color: var(--muted); font-size: 1.05rem; margin: .4rem 0 0; line-height: 1.5; }
+/* ---- The stage: dark, glowing, dot-grid header (Overview hero + every page header) ---- */
+.ap-stage, .ap-head { position: relative; overflow: hidden; color: #E9EDF5;
+  background:
+    radial-gradient(620px 320px at 95% -15%, rgba(244,180,0,.24), transparent 62%),
+    radial-gradient(540px 300px at -8% 115%, rgba(24,169,153,.22), transparent 62%),
+    linear-gradient(160deg, #0B1226 0%, #14213D 100%); }
+.ap-stage::before, .ap-head::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,.075) 1px, transparent 1.3px); background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%);
+          mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%); }
+.ap-stage > *, .ap-head > * { position: relative; }
+.ap-head { border-radius: 20px; padding: 26px 30px 24px; margin: 0 0 1.5rem; }
+.ap-head h1 { font-size: 2rem; font-weight: 750; margin: 0; padding: 0; line-height: 1.15; color: #fff; }
+.ap-head p { color: #B8C2D6; font-size: 1.03rem; margin: .45rem 0 0; line-height: 1.5; max-width: 720px; }
 
-/* The one loud moment: the plain-English verdict on Overview */
-.ap-verdict { margin: .2rem 0 1.6rem; max-width: 900px; }
-.ap-verdict .say { font-family: var(--display); font-weight: 650; font-size: clamp(1.6rem, 3.2vw, 2.55rem);
-  line-height: 1.18; letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.ap-verdict .say b { font-weight: 750; background: linear-gradient(transparent 64%, rgba(244,180,0,.38) 64%); padding: 0 2px; }
-.ap-verdict .pulse { display:block; width: 180px; height: 22px; margin: 14px 0 10px;
-  background: no-repeat left center / contain url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 22'%3E%3Cpolyline fill='none' stroke='%23F4B400' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' points='2,12 52,12 62,12 70,3 80,20 90,8 98,12 178,12'/%3E%3C/svg%3E"); }
-.ap-verdict .more { font-size: 1.05rem; color: var(--ink-2); line-height: 1.6; max-width: 760px; margin: 0; }
-.ap-verdict .more .up { color: var(--good); font-weight: 650; } .ap-verdict .more .down { color: var(--bad); font-weight: 650; }
+.ap-stage { border-radius: 26px; padding: 34px 38px 30px; margin: 0 0 1.6rem;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 34px; align-items: end; }
+.ap-stage .eyebrow { font-size: .95rem; color: #9AA6BD; margin-bottom: 10px; }
+.ap-stage .lead { font-family: var(--display); font-size: clamp(1.25rem, 2.2vw, 1.75rem); font-weight: 600;
+  color: #fff; line-height: 1.2; margin: 0; }
+.ap-stage .big { font-family: var(--display); font-weight: 750; font-size: clamp(3.6rem, 8.5vw, 6.6rem);
+  line-height: .95; letter-spacing: -0.045em; margin: 6px 0 4px; font-variant-numeric: tabular-nums;
+  background: linear-gradient(100deg, #FFD566 0%, #F4B400 45%, #FF8A5B 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ap-stage .detail { color: #B8C2D6; font-size: 1.03rem; line-height: 1.6; max-width: 560px; margin: 14px 0 0; }
+.ap-stage .detail b { color: #fff; font-weight: 650; }
+.ap-stage .up { color: #5FD39A; font-weight: 650; } .ap-stage .down { color: #FF8F80; font-weight: 650; }
+.ap-stage .flat { color: #B8C2D6; font-weight: 650; }
+.ap-spark .legend { display: flex; gap: 16px; font-size: .84rem; color: #9AA6BD; margin-bottom: 6px; }
+.ap-spark .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.ap-spark svg { width: 100%; height: auto; display: block; overflow: visible; }
+.ap-mini { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,.12); margin-top: 12px; }
+.ap-mini div { padding: 12px 8px 0 0; }
+.ap-mini b { display: block; font-family: var(--display); font-size: 1.3rem; color: #fff; font-variant-numeric: tabular-nums; }
+.ap-mini span { font-size: .82rem; color: #9AA6BD; }
+
+/* ---- Motion: one orchestrated entrance, then calm ---- */
+@keyframes ap-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes ap-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ap-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ap-ping { 0% { r: 5; opacity: .9; } 80%, 100% { r: 16; opacity: 0; } }
+.ap-rise { animation: ap-rise .75s cubic-bezier(.2,.7,.2,1) both; }
+.ap-d1 { animation-delay: .08s; } .ap-d2 { animation-delay: .18s; } .ap-d3 { animation-delay: .3s; } .ap-d4 { animation-delay: .45s; }
+.ap-head h1, .ap-head p { animation: ap-rise .6s cubic-bezier(.2,.7,.2,1) both; } .ap-head p { animation-delay: .1s; }
+.ap-spark .line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ap-draw 1.8s .35s cubic-bezier(.45,0,.2,1) forwards; }
+.ap-spark .line.b { animation-delay: .55s; }
+.ap-spark .area { opacity: 0; animation: ap-fade 1s 1.3s ease forwards; }
+.ap-spark .dot { opacity: 0; animation: ap-fade .3s 2.1s forwards; }
+.ap-spark .ping { opacity: 0; animation: ap-fade .1s 2.1s forwards, ap-ping 2.4s 2.2s ease-out infinite; }
+.ap-strip .m { animation: ap-rise .6s cubic-bezier(.2,.7,.2,1) both; }
+.ap-strip .m:nth-child(2) { animation-delay: .05s; } .ap-strip .m:nth-child(3) { animation-delay: .1s; }
+.ap-strip .m:nth-child(4) { animation-delay: .15s; } .ap-strip .m:nth-child(5) { animation-delay: .2s; }
+.ap-strip .m:nth-child(6) { animation-delay: .25s; }
+.ap-todo .t { transition: background .2s ease; } .ap-todo .t:hover { background: #FBFCFD; }
+@media (prefers-reduced-motion: reduce) {
+  .ap-spark .line { stroke-dashoffset: 0; } .ap-spark .area, .ap-spark .dot { opacity: 1; } .ap-spark .ping { display: none; }
+}
 
 /* Section header */
 .ap-section { display:flex; align-items:baseline; gap:12px; flex-wrap: wrap; margin: 2rem 0 .7rem; }
@@ -162,19 +206,19 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 .ap-gloss { display:grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 8px 18px; font-size: .95rem; }
 .ap-gloss dt { font-weight: 650; color: var(--ink); } .ap-gloss dd { margin: 0; color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 900px) {
+  .ap-stage { grid-template-columns: 1fr; gap: 22px; padding: 26px 22px 22px; border-radius: 20px; }
+}
 @media (max-width: 900px) { .ap-how { grid-template-columns: 1fr 1fr; } .ap-how .st:nth-child(2) { border-right: none; } }
 @media (max-width: 640px) {
   .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 3.6rem; }
-  .ap-head h1 { font-size: 1.6rem; }
+  .ap-head { padding: 20px 18px; border-radius: 16px; } .ap-head h1 { font-size: 1.55rem; }
   .ap-todo .t { grid-template-columns: 6px 1fr; } .ap-todo .n { grid-column: 2; }
   .ap-gloss { grid-template-columns: 1fr; }
   .ap-impact { text-align: left; }
 }
 </style>
 """
-
-PULSE_SVG = '<div class="pulse" aria-hidden="true"></div>'
-
 
 def inject_css() -> None:
     st.html(CSS)
@@ -185,10 +229,59 @@ def hero(title: str, subtitle: str = "", icon: str = "") -> None:
             + (f"<p>{html.escape(subtitle)}</p>" if subtitle else "") + "</div>")
 
 
-def verdict(say_html: str, more_html: str = "") -> None:
-    """The plain-English headline at the top of Overview. Pass trusted HTML (numbers escaped by caller)."""
-    st.html(f'<div class="ap-verdict"><p class="say">{say_html}</p>{PULSE_SVG}'
-            + (f'<p class="more">{more_html}</p>' if more_html else "") + "</div>")
+def sparkline(values: list[float], compare: list[float] | None = None, w: int = 600, h: int = 190) -> str:
+    """Smooth gradient line (+ optional faint comparison line) as one-line SVG that draws itself on load."""
+    series = [v for v in values if v is not None] + [v for v in (compare or []) if v is not None]
+    if len(values) < 2 or not series:
+        return ""
+    lo, hi = min(series), max(series)
+    span = (hi - lo) or 1.0
+    top, bottom = 14, h - 10
+
+    def pts(vals):
+        n = len(vals)
+        return [(i * w / (n - 1), bottom - (v - lo) / span * (bottom - top)) for i, v in enumerate(vals)]
+
+    def smooth(p):  # Catmull-Rom -> cubic Bezier
+        d = f"M{p[0][0]:.1f},{p[0][1]:.1f}"
+        for i in range(len(p) - 1):
+            p0, p1, p2 = p[max(i - 1, 0)], p[i], p[i + 1]
+            p3 = p[min(i + 2, len(p) - 1)]
+            c1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
+            c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
+            d += f" C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {p2[0]:.1f},{p2[1]:.1f}"
+        return d
+
+    main = pts(values)
+    line = smooth(main)
+    area = f"{line} L{w},{h} L0,{h} Z"
+    ex, ey = main[-1]
+    comp = (f'<path class="line b" pathLength="1" d="{smooth(pts(compare))}" fill="none" '
+            f'stroke="rgba(255,255,255,.38)" stroke-width="2" stroke-dasharray="1"/>') if compare else ""
+    return (f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="Weekly trend">'
+            '<defs><linearGradient id="apS" x1="0" x2="1"><stop offset="0" stop-color="#2DD4BF"/>'
+            '<stop offset=".55" stop-color="#F4B400"/><stop offset="1" stop-color="#FF8A5B"/></linearGradient>'
+            '<linearGradient id="apA" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="rgba(244,180,0,.32)"/>'
+            '<stop offset="1" stop-color="rgba(244,180,0,0)"/></linearGradient></defs>'
+            f'<path class="area" d="{area}" fill="url(#apA)"/>{comp}'
+            f'<path class="line" pathLength="1" d="{line}" fill="none" stroke="url(#apS)" stroke-width="3.5" '
+            'stroke-linecap="round"/>'
+            f'<circle class="ping" cx="{ex:.1f}" cy="{ey:.1f}" r="5" fill="none" stroke="#FF8A5B" stroke-width="2"/>'
+            f'<circle class="dot" cx="{ex:.1f}" cy="{ey:.1f}" r="5" fill="#FF8A5B"/></svg>')
+
+
+def stage(eyebrow: str, lead: str, big: str, after: str, detail_html: str, spark_svg: str = "",
+          legend: list[tuple[str, str]] | None = None, mini: list[tuple[str, str]] | None = None) -> None:
+    """The dark hero. Rendered with st.markdown because st.html strips SVG. Pass trusted HTML only."""
+    leg = "".join(f'<span><i style="background:{c}"></i>{html.escape(t)}</span>' for t, c in (legend or []))
+    minis = "".join(f"<div><b>{v}</b><span>{html.escape(t)}</span></div>" for v, t in (mini or []))
+    right = (f'<div class="ap-spark ap-rise ap-d2"><div class="legend">{leg}</div>{spark_svg}'
+             + (f'<div class="ap-mini">{minis}</div>' if minis else "") + "</div>") if spark_svg else "<div></div>"
+    block = (f'<div class="ap-stage"><div><div class="eyebrow ap-rise">{html.escape(eyebrow)}</div>'
+             f'<p class="lead ap-rise ap-d1">{html.escape(lead)}</p><div class="big ap-rise ap-d1">{big}</div>'
+             f'<p class="lead ap-rise ap-d2">{html.escape(after)}</p>'
+             f'<p class="detail ap-rise ap-d3">{detail_html}</p></div>{right}</div>')
+    st.markdown(block, unsafe_allow_html=True)
 
 
 def section(title: str, note: str = "") -> None:
