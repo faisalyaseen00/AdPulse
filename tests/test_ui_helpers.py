@@ -46,3 +46,17 @@ def test_menu_button_is_never_hidden():
 
 def test_motion_respects_reduced_motion_setting():
     assert "prefers-reduced-motion" in ui.CSS and ".ap-spark .line { stroke-dashoffset: 0; }" in ui.CSS
+
+
+def test_area_chart_has_months_tooltips_and_draws():
+    import pandas as pd
+    dates = list(pd.date_range("2026-06-01", periods=20, freq="W-MON"))
+    svg = ui.area_chart(dates, [("Sales", [float(i % 7 + 10) for i in range(20)], "#EB6834"),
+                                ("Spend", [float(i % 5 + 8) for i in range(20)], "#2A78D6")])
+    assert "\n" not in svg and svg.count('class="ln') == 2 and 'pathLength="1"' in svg
+    assert svg.count("<title>") == 20 and "Week of Jun 1" in svg  # one hover tip per week
+    assert ">Jun<" in svg and ">Oct<" in svg  # month labels on the axis
+
+
+def test_header_does_not_block_clicks():
+    assert 'header[data-testid="stHeader"] { background: transparent; pointer-events: none; }' in ui.CSS

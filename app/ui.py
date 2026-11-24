@@ -30,14 +30,18 @@ CSS = """
 html, body, .stApp, .stMarkdown p, .stMarkdown li, button, input, textarea, label { font-family: var(--body); }
 code, pre, .stCode * { font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; }
 .stApp { background: var(--paper); color: var(--ink); }
-.block-container { padding-top: 2.2rem; padding-bottom: 4rem; max-width: 1240px; }
+.block-container { padding-top: 3.2rem; padding-bottom: 4rem; max-width: 1240px; }
 h1, h2, h3, h4 { font-family: var(--display); color: var(--ink); letter-spacing: -0.01em; }
 .stMarkdown p, .stMarkdown li { font-size: 1rem; line-height: 1.6; color: var(--ink-2); }
 #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; height: 0; }
 /* hosting toolbar (Fork / GitHub / deploy buttons) is noise for business readers */
 /* hide only the actions (Fork, GitHub, deploy). Never the toolbar itself: it holds the open-menu button */
 [data-testid="stToolbarActions"], .stAppDeployButton { display: none !important; }
-header[data-testid="stHeader"] { background: transparent; }
+/* The transparent top bar is 60px tall and sat on top of the first row of buttons, swallowing clicks.
+   Let clicks pass through it, except on its own controls (the open-menu button). */
+header[data-testid="stHeader"] { background: transparent; pointer-events: none; }
+header[data-testid="stHeader"] button, header[data-testid="stHeader"] a,
+[data-testid="stExpandSidebarButton"] { pointer-events: auto; }
 :focus-visible { outline: 2px solid var(--pulse) !important; outline-offset: 2px; }
 
 /* Sidebar */
@@ -65,7 +69,7 @@ header[data-testid="stHeader"] { background: transparent; }
   -webkit-mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%);
           mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%); }
 .ap-stage > *, .ap-head > * { position: relative; }
-.ap-head { border-radius: 20px; padding: 26px 30px 24px; margin: 0 0 1.5rem; }
+.ap-head { border-radius: 20px; padding: 22px 28px 20px; margin: 0 0 1.4rem; }
 .ap-head h1 { font-size: 2rem; font-weight: 750; margin: 0; padding: 0; line-height: 1.15; color: #fff; }
 .ap-head p { color: #B8C2D6; font-size: 1.03rem; margin: .45rem 0 0; line-height: 1.5; max-width: 720px; }
 
@@ -78,14 +82,20 @@ header[data-testid="stHeader"] { background: transparent; }
   line-height: .95; letter-spacing: -0.045em; margin: 6px 0 4px; font-variant-numeric: tabular-nums;
   background: linear-gradient(100deg, #FFD566 0%, #F4B400 45%, #FF8A5B 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
-.ap-stage .detail { color: #B8C2D6; font-size: 1.03rem; line-height: 1.6; max-width: 560px; margin: 14px 0 0; }
+.ap-stage .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 18px; }
+.ap-stage .detail { color: #B8C2D6; font-size: .98rem; }
+.ap-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+  font-size: .86rem; font-weight: 650; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); }
+.ap-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ap-pill.good { color: #5FD39A; } .ap-pill.ok { color: #FFD566; } .ap-pill.bad { color: #FF8F80; }
+.ap-spark .cap { font-size: .82rem; color: #8592AB; margin-top: 8px; }
 .ap-stage .detail b { color: #fff; font-weight: 650; }
 .ap-stage .up { color: #5FD39A; font-weight: 650; } .ap-stage .down { color: #FF8F80; font-weight: 650; }
 .ap-stage .flat { color: #B8C2D6; font-weight: 650; }
 .ap-spark .legend { display: flex; gap: 16px; font-size: .84rem; color: #9AA6BD; margin-bottom: 6px; }
 .ap-spark .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .ap-spark svg { width: 100%; height: auto; display: block; overflow: visible; }
-.ap-mini { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,.12); margin-top: 12px; }
+.ap-mini-unused { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,.12); margin-top: 12px; }
 .ap-mini div { padding: 12px 8px 0 0; }
 .ap-mini b { display: block; font-family: var(--display); font-size: 1.3rem; color: #fff; font-variant-numeric: tabular-nums; }
 .ap-mini span { font-size: .82rem; color: #9AA6BD; }
@@ -122,7 +132,8 @@ header[data-testid="stHeader"] { background: transparent; }
   border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .ap-strip .m { padding: 16px 18px 15px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2);
   margin: 0 -1px -1px 0; container-type: inline-size; }
-.ap-strip .l { font-size: .9rem; color: var(--muted); font-weight: 500; display:flex; gap:6px; align-items:center; cursor: help; }
+.ap-strip .l { font-size: .9rem; color: var(--muted); font-weight: 500; display:flex; gap:6px; align-items:center;
+  cursor: help; white-space: nowrap; min-width: 0; }
 .ap-strip .l .i { font-size: .72rem; color: var(--faint); border: 1px solid var(--line); border-radius: 50%;
   width: 15px; height: 15px; display:inline-grid; place-items:center; flex: none; }
 .ap-strip .v { font-family: var(--display); font-weight: 700; font-size: clamp(1.15rem, 17cqi, 1.9rem);
@@ -140,13 +151,16 @@ header[data-testid="stHeader"] { background: transparent; }
 .ap-todo .bar.good { background: var(--good); } .ap-todo .bar.bad { background: var(--bad); } .ap-todo .bar.warn { background: var(--pulse); }
 .ap-todo .h { font-weight: 650; color: var(--ink); font-size: 1.02rem; }
 .ap-todo .x { color: var(--ink-2); font-size: .95rem; margin-top: 2px; line-height: 1.5; }
-.ap-todo .n { font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--ink); white-space: nowrap; }
-.ap-todo .n small { display:block; font-family: var(--body); font-weight: 500; font-size: .78rem; color: var(--muted); text-align: right; }
+.ap-todo .n { font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--ink); white-space: nowrap;
+  text-align: right; min-width: 210px; font-variant-numeric: tabular-nums; }
+.ap-todo .n small { display:block; font-family: var(--body); font-weight: 500; font-size: .78rem; color: var(--muted); }
+.ap-todo .t { align-items: center; }
 
 /* Journey: ad view to customer */
-.ap-flow { display:flex; align-items:stretch; flex-wrap: nowrap; overflow-x:auto; background: var(--surface);
-  border: 1px solid var(--line); border-radius: 14px; }
-.ap-flow .node { flex: 1 1 0; min-width: 128px; padding: 14px 16px; border-right: 1px solid var(--line-2); }
+.ap-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.ap-flow .node { padding: 14px 16px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2);
+  margin: 0 -1px -1px 0; }
 .ap-flow .node:last-child { border-right: none; background: var(--pulse-soft); }
 .ap-flow .node .t { font-size: .88rem; color: var(--muted); font-weight: 500; }
 .ap-flow .node .v { font-family: var(--display); font-weight: 700; font-size: 1.35rem; color: var(--ink);
@@ -185,6 +199,67 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .ap-impact .c { font-size: .82rem; color: var(--muted); }
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: .8rem; line-height: 1.45; }
+/* Bordered containers = control bars and cards: white, rounded, aligned */
+/* panels: st.container(border=True, key="panel_...") get a white card look */
+[class*="st-key-panel_"] { background: var(--surface); border-radius: 16px !important; border-color: var(--line) !important; }
+.ap-bars { display: flex; flex-direction: column; gap: 12px; }
+.ap-bars .r { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "k v" "t t"; gap: 6px 12px; }
+.ap-bars .k { grid-area: k; font-size: .92rem; color: var(--ink-2); min-width: 0; }
+.ap-bars .v { grid-area: v; }
+.ap-bars .track { grid-area: t; }
+.ap-bars .track { height: 10px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.ap-bars .fill { height: 100%; border-radius: 999px; transform-origin: left; animation: ap-grow .9s .2s cubic-bezier(.2,.7,.2,1) both; }
+.ap-bars .v { font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); font-size: .95rem; }
+@keyframes ap-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ap-share { height: 14px; border-radius: 999px; background: #E8F5EE; overflow: hidden; display: flex; margin: 10px 0 6px; }
+.ap-share .w { background: linear-gradient(90deg, #FF8A5B, #C23B2E); transform-origin: left;
+  animation: ap-grow 1s .25s cubic-bezier(.2,.7,.2,1) both; }
+.ap-share-legend { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); }
+.ap-big { font-family: var(--display); font-weight: 750; font-size: clamp(2.4rem, 5vw, 3.4rem); letter-spacing: -0.03em;
+  color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+.ap-big.bad { color: var(--bad); }
+.ap-sub { color: var(--ink-2); font-size: 1rem; margin-top: 6px; }
+.ap-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ap-list { display: flex; flex-direction: column; }
+.ap-list .i { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line-2); }
+.ap-list .i:first-child { border-top: none; padding-top: 2px; }
+.ap-list .n { font-weight: 650; color: var(--ink); }
+.ap-list .m { font-size: .88rem; color: var(--muted); grid-column: 1 / -1; }
+.ap-list .x { font-family: var(--display); font-weight: 700; color: var(--ink); white-space: nowrap; }
+.ap-list .x.good { color: var(--good); } .ap-list .x.bad { color: var(--bad); }
+.ap-card-h { font-family: var(--display); font-weight: 650; font-size: 1.12rem; color: var(--ink); margin: 0 0 10px;
+  display: flex; align-items: center; gap: 8px; }
+.ap-card-h .dot { width: 9px; height: 9px; border-radius: 50%; }
+.ap-summary { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.ap-summary li { position: relative; padding-left: 22px; color: var(--ink-2); font-size: 1rem; line-height: 1.55; }
+.ap-summary li::before { content: ""; position: absolute; left: 4px; top: .6em; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--pulse); }
+/* Animated chart cards */
+.ap-chart { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px 12px; height: 100%; }
+.ap-chart .hd { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.ap-chart .t { font-family: var(--display); font-weight: 650; font-size: 1.12rem; color: var(--ink); }
+.ap-chart .nt { font-size: .86rem; color: var(--muted); margin-top: 2px; }
+.ap-chart .lg { display: flex; gap: 16px; flex-wrap: wrap; font-size: .88rem; color: var(--ink-2); }
+.ap-chart .lg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.ap-chart .lg b { font-variant-numeric: tabular-nums; }
+.ap-area { width: 100%; height: auto; display: block; overflow: visible; }
+.ap-area .g { stroke: #EEF0F4; stroke-width: 1; }
+.ap-area .yl { font: 500 13px Figtree, sans-serif; fill: #8A92A3; text-anchor: end; }
+.ap-area .xl { font: 500 13px Figtree, sans-serif; fill: #8A92A3; text-anchor: start; }
+.ap-area .ln { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ap-draw 1.9s .2s cubic-bezier(.45,0,.2,1) forwards; }
+.ap-area .ln.l1 { animation-delay: .45s; }
+.ap-area .fillp { opacity: 0; animation: ap-fade 1s 1.2s ease forwards; }
+.ap-area .end { opacity: 0; animation: ap-fade .3s 2s forwards; }
+.ap-area .hit { fill: transparent; cursor: crosshair; }
+.ap-area .hit:hover { fill: rgba(20,33,61,.05); }
+.cmp { display: flex; flex-direction: column; gap: 18px; margin-top: 14px; }
+.cmp .cr { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n v" "t t"; gap: 8px 12px; }
+.cmp .cn { grid-area: n; font-weight: 600; color: var(--ink-2); }
+.cmp .cv { grid-area: v; font-family: var(--display); font-weight: 750; font-size: 1.5rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cmp .ct { grid-area: t; height: 14px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.cmp .cf { height: 100%; border-radius: 999px; transform-origin: left; animation: ap-grow 1s .25s cubic-bezier(.2,.7,.2,1) both; }
+.ap-chart .vd { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-2); font-size: .95rem; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .ap-area .ln { stroke-dashoffset: 0; } .ap-area .fillp, .ap-area .end { opacity: 1; } }
 .ap-card-title { font-family: var(--display); font-weight: 650; font-size: 1.15rem; color: var(--ink); }
 .ap-muted { color: var(--muted); font-size: .92rem; }
 .ap-why { color: var(--ink-2); font-size: 1rem; line-height: 1.55; margin: 8px 0 6px; }
@@ -213,7 +288,7 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 @media (max-width: 640px) {
   .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 3.6rem; }
   .ap-head { padding: 20px 18px; border-radius: 16px; } .ap-head h1 { font-size: 1.55rem; }
-  .ap-todo .t { grid-template-columns: 6px 1fr; } .ap-todo .n { grid-column: 2; }
+  .ap-todo .t { grid-template-columns: 6px 1fr; } .ap-todo .n { grid-column: 2; text-align: left; min-width: 0; }
   .ap-gloss { grid-template-columns: 1fr; }
   .ap-impact { text-align: left; }
 }
@@ -270,17 +345,109 @@ def sparkline(values: list[float], compare: list[float] | None = None, w: int = 
             f'<circle class="dot" cx="{ex:.1f}" cy="{ey:.1f}" r="5" fill="#FF8A5B"/></svg>')
 
 
-def stage(eyebrow: str, lead: str, big: str, after: str, detail_html: str, spark_svg: str = "",
-          legend: list[tuple[str, str]] | None = None, mini: list[tuple[str, str]] | None = None) -> None:
+def _smooth(p: list[tuple[float, float]]) -> str:
+    """Catmull-Rom spline through points, as an SVG path."""
+    d = f"M{p[0][0]:.1f},{p[0][1]:.1f}"
+    for i in range(len(p) - 1):
+        p0, p1, p2, p3 = p[max(i - 1, 0)], p[i], p[i + 1], p[min(i + 2, len(p) - 1)]
+        c1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
+        c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
+        d += f" C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {p2[0]:.1f},{p2[1]:.1f}"
+    return d
+
+
+def _k(v: float) -> str:
+    return f"${v / 1000:,.0f}k" if abs(v) >= 1000 else f"${v:,.0f}"
+
+
+def area_chart(dates: list, series: list[tuple[str, list[float], str]], tip: str = "Week of %b %-d",
+               w: int = 640, h: int = 250) -> str:
+    """Light, animated trend chart as one-line SVG (st.markdown keeps SVG; st.html strips it).
+    series: (name, values, colour). The first series gets a soft gradient fill. Native hover tips per point."""
+    n = len(dates)
+    if n < 2:
+        return ""
+    allv = [v for _, vals, _ in series for v in vals]
+    lo, hi = min(allv), max(allv)
+    pad = (hi - lo) * 0.12 or 1
+    lo, hi = max(0, lo - pad), hi + pad
+    L, R, T, B = 48, 12, 12, 28
+    pw, ph = w - L - R, h - T - B
+
+    def xy(i, v):
+        return L + i * pw / (n - 1), T + (1 - (v - lo) / (hi - lo)) * ph
+
+    out = [f'<svg class="ap-area" viewBox="0 0 {w} {h}" role="img" aria-label="Trend chart"><defs>']
+    out.append('<linearGradient id="apAreaFill" x1="0" x2="0" y1="0" y2="1">'
+               f'<stop offset="0" stop-color="{series[0][2]}" stop-opacity=".28"/>'
+               f'<stop offset="1" stop-color="{series[0][2]}" stop-opacity="0"/></linearGradient></defs>')
+    for j in range(5):  # gridlines + y labels
+        v = lo + (hi - lo) * j / 4
+        y = T + (1 - j / 4) * ph
+        out.append(f'<line x1="{L}" x2="{w - R}" y1="{y:.1f}" y2="{y:.1f}" class="g"/>'
+                   f'<text x="{L - 10}" y="{y + 4:.1f}" class="yl">{_k(v)}</text>')
+    seen = set()
+    for i, d in enumerate(dates):  # month labels at the first point of each month
+        key = (d.year, d.month)
+        if key not in seen:
+            seen.add(key)
+            x = xy(i, lo)[0]
+            out.append(f'<text x="{x:.1f}" y="{h - 6}" class="xl">{d:%b}</text>')
+    for k, (name, vals, color) in enumerate(series):
+        pts = [xy(i, v) for i, v in enumerate(vals)]
+        path = _smooth(pts)
+        if k == 0:
+            out.append(f'<path class="fillp" d="{path} L{pts[-1][0]:.1f},{T + ph} L{pts[0][0]:.1f},{T + ph} Z" '
+                       'fill="url(#apAreaFill)"/>')
+        out.append(f'<path class="ln l{k}" pathLength="1" d="{path}" fill="none" stroke="{color}" '
+                   f'stroke-width="{3 if k == 0 else 2.2}" stroke-linecap="round"/>')
+        ex, ey = pts[-1]
+        out.append(f'<circle class="end" cx="{ex:.1f}" cy="{ey:.1f}" r="4.5" fill="{color}" stroke="#fff" '
+                   'stroke-width="2"/>')
+    for i, d in enumerate(dates):  # hover columns with native tooltips
+        x = xy(i, lo)[0]
+        label = d.strftime(tip) + "&#10;" + "&#10;".join(f"{nm}: ${vals[i]:,.0f}" for nm, vals, _ in series)
+        out.append(f'<rect class="hit" x="{x - pw / (n - 1) / 2:.1f}" y="{T}" width="{pw / (n - 1):.1f}" '
+                   f'height="{ph}"><title>{label}</title></rect>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def chart_card(title: str, note: str, svg: str, legend: list[tuple[str, str, str]]) -> None:
+    """A white card with title, note, legend (name, colour, value text) and an animated SVG chart."""
+    leg = "".join(f'<span><i style="background:{c}"></i>{html.escape(n)} <b>{html.escape(v)}</b></span>'
+                  for n, c, v in legend)
+    st.markdown(f'<div class="ap-chart"><div class="hd"><div><div class="t">{html.escape(title)}</div>'
+                f'<div class="nt">{html.escape(note)}</div></div><div class="lg">{leg}</div></div>{svg}</div>',
+                unsafe_allow_html=True)
+
+
+def compare_card(title: str, note: str, rows: list[tuple[str, float, str, str]], verdict: str = "") -> None:
+    """Side-by-side comparison with growing bars: (name, value, value text, colour). Lower is better here."""
+    top = max((v for _, v, _, _ in rows), default=0) or 1
+    body = "".join(
+        f'<div class="cr"><div class="cn">{html.escape(n)}</div><div class="cv">{html.escape(t)}</div>'
+        f'<div class="ct"><div class="cf" style="width:{v / top * 100:.1f}%;background:{c}"></div></div></div>'
+        for n, v, t, c in rows)
+    st.html(f'<div class="ap-chart"><div class="hd"><div><div class="t">{html.escape(title)}</div>'
+            f'<div class="nt">{html.escape(note)}</div></div></div><div class="cmp">{body}</div>'
+            + (f'<div class="vd">{html.escape(verdict)}</div>' if verdict else "") + "</div>")
+
+
+def stage(eyebrow: str, lead: str, big: str, after: str, detail_html: str = "", spark_svg: str = "",
+          legend: list[tuple[str, str]] | None = None, pill: tuple[str, str] | None = None,
+          caption: str = "") -> None:
     """The dark hero. Rendered with st.markdown because st.html strips SVG. Pass trusted HTML only."""
     leg = "".join(f'<span><i style="background:{c}"></i>{html.escape(t)}</span>' for t, c in (legend or []))
-    minis = "".join(f"<div><b>{v}</b><span>{html.escape(t)}</span></div>" for v, t in (mini or []))
+    pill_html = (f'<span class="ap-pill {pill[0]}">{html.escape(pill[1])}</span>') if pill else ""
     right = (f'<div class="ap-spark ap-rise ap-d2"><div class="legend">{leg}</div>{spark_svg}'
-             + (f'<div class="ap-mini">{minis}</div>' if minis else "") + "</div>") if spark_svg else "<div></div>"
+             + (f'<div class="cap">{html.escape(caption)}</div>' if caption else "") + "</div>"
+             ) if spark_svg else "<div></div>"
     block = (f'<div class="ap-stage"><div><div class="eyebrow ap-rise">{html.escape(eyebrow)}</div>'
              f'<p class="lead ap-rise ap-d1">{html.escape(lead)}</p><div class="big ap-rise ap-d1">{big}</div>'
              f'<p class="lead ap-rise ap-d2">{html.escape(after)}</p>'
-             f'<p class="detail ap-rise ap-d3">{detail_html}</p></div>{right}</div>')
+             f'<div class="row ap-rise ap-d3">{pill_html}<span class="detail">{detail_html}</span></div></div>'
+             f'{right}</div>')
     st.markdown(block, unsafe_allow_html=True)
 
 
@@ -308,6 +475,23 @@ def todo(items: list[tuple[str, str, str, str, str]]) -> None:
         f'<div class="t"><div class="bar {tone}"></div><div><div class="h">{html.escape(t)}</div>'
         f'<div class="x">{html.escape(x)}</div></div><div class="n">{html.escape(n)}<small>{html.escape(c)}</small></div></div>'
         for tone, t, x, n, c in items) + "</div>")
+
+
+def bars(items: list[tuple[str, float, str]], color: str = "linear-gradient(90deg,#FF8A5B,#C23B2E)") -> None:
+    """Horizontal bars that grow in on load: (label, value, value text)."""
+    top = max((v for _, v, _ in items), default=0) or 1
+    st.html('<div class="ap-bars">' + "".join(
+        f'<div class="r"><div class="k" title="{html.escape(k)}">{html.escape(k)}</div><div class="track">'
+        f'<div class="fill" style="width:{max(2, v / top * 100):.1f}%;background:{color}"></div></div>'
+        f'<div class="v">{html.escape(t)}</div></div>' for k, v, t in items) + "</div>")
+
+
+def card_list(title: str, dot: str, rows: list[tuple[str, str, str, str]]) -> None:
+    """A titled list card: (name, number text, number tone good|bad|'', detail line)."""
+    st.html(f'<div class="ap-card-h"><span class="dot" style="background:{dot}"></span>{html.escape(title)}</div>'
+            '<div class="ap-list">' + "".join(
+                f'<div class="i"><div class="n">{html.escape(n)}</div><div class="x {tone}">{html.escape(x)}</div>'
+                f'<div class="m">{html.escape(m)}</div></div>' for n, x, tone, m in rows) + "</div>")
 
 
 def glossary(keys: list[str], title: str = "What do these words mean?") -> None:

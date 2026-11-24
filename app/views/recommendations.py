@@ -7,22 +7,23 @@ import ui
 
 from adpulse.actions import recommendations as recs
 
-ui.hero("Suggestions", "Ideas to spend your ad money better. Approve the ones you agree with, then make the "
-        "change in Meta or Google. Nothing changes on its own.")
+ui.hero("Suggestions", "Approve what you agree with. Nothing changes on its own.")
 if not ui.require_warehouse():
     st.stop()
 
-top = st.columns([2, 2, 3])
-window = top[0].selectbox("Based on", [14, 30, 60], index=1, format_func=lambda d: f"The last {d} days")
-if top[1].button("Check my ads for new ideas", type="primary", width="stretch"):
+who = ui.reviewer()
+with st.container(border=True, key="panel_controls"):
+    top = st.columns([1.2, 1.2, 1.8], vertical_alignment="bottom")
+    window = top[0].selectbox("Look at", [14, 30, 60], index=1, format_func=lambda d: f"The last {d} days")
+    check = top[1].button("Check my ads for new ideas", type="primary", width="stretch", icon=":material/autorenew:")
+    top[2].html('<div style="min-height:40px;display:flex;align-items:center">'
+                + (ui.badge(f"Deciding as {who}", "good") if who else
+                   ui.badge("Type your name in the sidebar to approve or reject", "warn")) + "</div>")
+if check:
     found = recs.rule_recommendations(window)
     n = recs.save(found)
     ui.suggestions_changed()
     st.toast(f"{n} new suggestion(s) added" if n else "No new suggestions: your list is up to date", icon="✅")
-
-who = ui.reviewer()
-if not who:
-    top[2].info("Type **your name** in the sidebar to approve or reject.", icon=":material/badge:")
 
 df = ui.suggestions()
 if df.empty:

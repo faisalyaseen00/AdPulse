@@ -6,7 +6,7 @@ from adpulse import warehouse
 from adpulse.config import get_settings
 from adpulse.pipeline import demo_data, ingest, transform
 
-ui.hero("Data status", "Where your numbers come from, and how fresh they are.")
+ui.hero("Data status", "Where your numbers come from.")
 s = get_settings()
 h = ui.health()
 if not h.ok:

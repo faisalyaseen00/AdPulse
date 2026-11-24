@@ -19,8 +19,7 @@ SUGGESTIONS = [
     "Compare Meta and Google this quarter: spend, new customers and what those customers are worth",
 ]
 
-ui.hero("Ask a question", "Ask anything about your ads in your own words. Every number in the answer is "
-        "checked against your real data before you see it.")
+ui.hero("Ask a question", "Plain answers, checked against your data.")
 if not ui.require_warehouse():
     st.stop()
 
@@ -148,7 +147,7 @@ def render_chart(a: AgentAnswer) -> None:
     if money:
         fig.update_xaxes(tickprefix="$") if (c.type == "bar" and df[c.x].dtype == object and len(df) > 5) \
             else fig.update_yaxes(tickprefix="$")
-    st.plotly_chart(fig, width="stretch", key=f"chart_{a.id}")
+    st.plotly_chart(fig, width="stretch", key=f"chart_{a.id}", config={"displayModeBar": False})
 
 
 # ------------------------------------------------------------------ chat

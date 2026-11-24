@@ -1,7 +1,6 @@
 import html
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 import ui
 
@@ -42,99 +41,91 @@ def chg(a, b):
 roas, roas_p = (k.rev / k.spend if k.spend else 0), (k.rev_p / k.spend_p if k.spend_p else 0)
 cac, cac_p = (k.spend / k.cust if k.cust else 0), (k.spend_p / k.cust_p if k.cust_p else 0)
 end = pd.Timestamp(k.end_date)
-period = "before"
+period = f"previous {window} days"
+target = get_settings().target_cac
 
-# ---- The stage: the answer in three seconds, with the trend drawing itself beside it ------------------
+# ---- The stage: the answer, a verdict, and this period's trend drawing itself --------------------------
 if roas >= 1.5:
-    after = "back for every $1 you spent. A healthy return."
+    pill = ("good", "Healthy return")
 elif roas >= 1:
-    after = "back for every $1 you spent. Ads are paying for themselves."
+    pill = ("ok", "Ads are paying for themselves")
 else:
-    after = "back for every $1 you spent. Less than they cost."
-rev_change = chg(k.rev, k.rev_p)
-detail = (f"You spent <b>{ui.money(k.spend)}</b> and won <b>{k.cust:,.0f} new customers</b> at "
-          f"<b>{ui.money(cac, 2)}</b> each. ")
-if k.ltv90 and not pd.isna(k.ltv90) and cac:
-    detail += (f"Each is worth about <b>{ui.money(k.ltv90, 2)}</b> in their first 90 days, "
-               f"<b>{plain.times(k.ltv90 / cac)}</b> what it cost to win them. ")
-if rev_change is not None:
-    detail += f"Sales from ads {ui.change_text(rev_change, 'up', 'the ' + str(window) + ' days before')}."
-
-wk = ui.q("""
-    SELECT toStartOfWeek(d.date, 1) AS week, round(sum(d.spend), 2) AS spend,
-           round(any(r.revenue), 2) AS revenue
-    FROM fct_ad_daily d
-    LEFT JOIN (SELECT toStartOfWeek(order_date, 1) AS week, sum(revenue) AS revenue FROM fct_orders
-               WHERE platform != 'unpaid' GROUP BY week) r ON r.week = toStartOfWeek(d.date, 1)
-    GROUP BY week ORDER BY week
-""")
-wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
-recent = wk.tail(26)
+    pill = ("bad", "Ads cost more than they bring back")
+daily = ui.q("""
+    WITH (SELECT max(date) FROM fct_ad_daily) AS e
+    SELECT d.day AS day, d.spend AS spend, ifNull(r.revenue, 0) AS revenue
+    FROM (SELECT date AS day, round(sum(spend), 2) AS spend FROM fct_ad_daily
+          WHERE date > e - {w:UInt32} GROUP BY day) d
+    LEFT JOIN (SELECT order_date AS day, round(sum(revenue), 2) AS revenue FROM fct_orders
+               WHERE platform != 'unpaid' AND order_date > e - {w:UInt32} GROUP BY day) r ON r.day = d.day
+    ORDER BY day
+    SETTINGS join_use_nulls = 1
+""", (("w", window),))
 ui.stage(
     eyebrow=f"Last {window} days, up to {end:%B %-d, %Y}",
-    lead="Your ads brought back", big=plain.per_dollar(roas), after=after, detail_html=detail,
-    spark_svg=ui.sparkline(recent.revenue.astype(float).tolist(), recent.spend.astype(float).tolist()),
-    legend=[("Sales from ads, weekly", "linear-gradient(90deg,#2DD4BF,#F4B400,#FF8A5B)"),
+    lead="Your ads brought back", big=plain.per_dollar(roas), after="for every $1 you spent",
+    pill=pill,
+    detail_html=f"Sales from ads {ui.change_text(chg(k.rev, k.rev_p), 'up', period)}",
+    spark_svg=ui.sparkline(daily.revenue.astype(float).tolist(), daily.spend.astype(float).tolist()),
+    legend=[("Sales from ads", "linear-gradient(90deg,#2DD4BF,#F4B400,#FF8A5B)"),
             ("Ad spend", "rgba(255,255,255,.45)")],
-    mini=[(ui.money(recent.revenue.iloc[-1]), "sales last full week"),
-          (ui.money(recent.spend.iloc[-1]), "spent last full week"),
-          (f"{len(recent)} weeks", "shown in the line")],
+    caption=f"Day by day, last {window} days",
 )
 
-# ---- Numbers at a glance --------------------------------------------------------------------------------
+# ---- Numbers at a glance (short labels, so every tile lines up) ---------------------------------------
 ui.kpi_row([
-    ui.kpi(plain.label("spend"), ui.money(k.spend), chg(k.spend, k.spend_p), "neutral", help=plain.explain("spend"),
-           period=period),
-    ui.kpi(plain.label("paid_revenue"), ui.money(k.rev), chg(k.rev, k.rev_p), help=plain.explain("paid_revenue"),
-           period=period),
-    ui.kpi(plain.label("roas"), plain.per_dollar(roas), chg(roas, roas_p), help=plain.explain("roas"), period=period),
-    ui.kpi(plain.label("new_customers"), f"{k.cust:,.0f}", chg(k.cust, k.cust_p), help=plain.explain("new_customers"),
-           period=period),
-    ui.kpi(plain.label("cac"), ui.money(cac, 2), chg(cac, cac_p), "down", help=plain.explain("cac"), period=period),
-    ui.kpi(plain.label("ltv90"), ui.money(k.ltv90, 2), note="per customer, first 90 days", help=plain.explain("ltv90")),
+    ui.kpi("Ad spend", ui.money(k.spend), chg(k.spend, k.spend_p), "neutral", help=plain.explain("spend"),
+           period="before"),
+    ui.kpi("Sales from ads", ui.money(k.rev), chg(k.rev, k.rev_p), help=plain.explain("paid_revenue"),
+           period="before"),
+    ui.kpi("New customers", f"{k.cust:,.0f}", chg(k.cust, k.cust_p), help=plain.explain("new_customers"),
+           period="before"),
+    ui.kpi("Cost per customer", ui.money(cac, 2), chg(cac, cac_p), "down", help=plain.explain("cac"),
+           period="before"),
+    ui.kpi("Customer value", ui.money(k.ltv90, 2), note="first 90 days", help=plain.explain("ltv90")),
+    ui.kpi("Value vs cost", plain.times(k.ltv90 / cac) if cac and k.ltv90 else "–", note="per customer won",
+           help=plain.explain("ltv_to_cac")),
 ])
 
 
-# ---- What to do this week -------------------------------------------------------------------------------
+# ---- What to do: worked out for the selected period ----------------------------------------------------
 @st.cache_data(ttl=300, show_spinner=False)
 def wasted(days: int) -> dict:
     return search_terms.summary(search_terms.audit(days, llm=None))
 
 
-pending = ui.suggestions()
-pending = pending[pending.status == "pending"] if not pending.empty else pending
+per_month = 30 / window
+econ = ui.ad_economics(window)
 items = []
-if not pending.empty:
-    scale = pending[pending.kind == "scale_ad"].sort_values("est_impact", ascending=False)
-    pause = pending[pending.kind == "pause_ad"].sort_values("est_impact", ascending=False)
-    if not scale.empty:
-        r = scale.iloc[0]
-        m = r.metrics
-        items.append(("good", f"Give “{r.entity_name}” more budget",
-                      (f"Each new customer from this ad costs {ui.money(m.get('cac_window'), 2)} and is worth "
-                       f"about {ui.money(m.get('ltv_estimate'), 2)}."),
-                      f"+{ui.money(r.est_impact)}", "extra customer value / month"))
-    if not pause.empty:
-        r = pause.iloc[0]
-        m = r.metrics
-        detail = (f"Each new customer costs {ui.money(m.get('cac_window'), 2)} but only spends "
-                  f"{ui.money(m.get('ltv_estimate'), 2)}." if m.get("new_customers_window")
-                  else f"It spent {ui.money(m.get('spend_window'))} without winning a single new customer.")
-        items.append(("bad", f"Pause “{r.entity_name}”", detail, ui.money(r.est_impact), "saved / month"))
-w = wasted(30)
+if not econ.empty:
+    good = econ[(econ.ltv_to_cac >= 2.5) & (econ.cac_window <= target) & (econ.new_customers_window > 0)]
+    if not good.empty:
+        r = good.sort_values("ltv_to_cac", ascending=False).iloc[0]
+        extra = r.spend_window * 0.2 * per_month
+        gain = extra / r.cac_window * r.ltv_estimate - extra
+        items.append(("good", f"Give “{r.ad_name}” more budget",
+                      f"Each new customer costs {ui.money(r.cac_window, 2)} and is worth {ui.money(r.ltv_estimate, 2)}.",
+                      f"+{ui.money(gain)}", "per month with 20% more budget"))
+    bad = econ[(econ.new_customers_window == 0) | (econ.ltv_to_cac < 1)]
+    if not bad.empty:
+        r = bad.sort_values("spend_window", ascending=False).iloc[0]
+        why = (f"Each new customer costs {ui.money(r.cac_window, 2)} but spends only {ui.money(r.ltv_estimate, 2)}."
+               if r.new_customers_window else f"It spent {ui.money(r.spend_window)} and won no customers.")
+        items.append(("bad", f"Pause “{r.ad_name}”", why, ui.money(r.spend_window * per_month), "saved per month"))
+w = wasted(window)
 if w["flagged"]:
-    items.append(("warn", f"Block {w['flagged']} searches that never turn into sales",
-                  "People searching for jobs, free samples or store hours are clicking your ads.",
-                  ui.money(w["wasted_spend"]), "wasted in 30 days"))
+    items.append(("warn", f"Block {w['flagged']} searches that never sell",
+                  "Job seekers, freebie hunters and people looking for store hours.",
+                  ui.money(w["wasted_spend"]), f"wasted in {window} days"))
 
-ui.section("What to do this week", "nothing changes until you approve it")
+ui.section("What to do next", f"based on the last {window} days")
 if items:
     ui.todo(items)
     b1, b2, _ = st.columns([1, 1, 2])
     b1.page_link("views/recommendations.py", label="Review suggestions", icon=":material/task_alt:")
     b2.page_link("views/audit.py", label="See wasted searches", icon=":material/money_off:")
 else:
-    st.success("Nothing needs your attention right now.")
+    st.success("Nothing needs your attention in this period.")
 
 # ---- From ad to customer --------------------------------------------------------------------------------
 ui.section("From ad to customer", f"last {window} days")
@@ -151,16 +142,24 @@ st.html('<div class="ap-flow">' + "".join(
     f'<div class="node"><div class="t">{html.escape(t)}</div><div class="v">{v}</div><div class="s">{html.escape(s)}</div></div>'
     for t, v, s in flow) + "</div>")
 
-# ---- Charts ---------------------------------------------------------------------------------------------
-c1, c2 = st.columns([3, 2])
+# ---- Charts -----------------------------------------------------------------------------------------------
+c1, c2 = st.columns([1.75, 1], gap="medium")
 with c1:
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=wk.week, y=wk.revenue, name="Sales from ads", mode="lines",
-                             line={"color": ui.SERIES[1], "width": 2.5}, hovertemplate="$%{y:,.0f}"))
-    fig.add_trace(go.Scatter(x=wk.week, y=wk.spend, name="Ad spend", mode="lines",
-                             line={"color": ui.SERIES[0], "width": 2.5}, hovertemplate="$%{y:,.0f}"))
-    fig.update_layout(title="Ad spend and the sales it brought in, by week", hovermode="x unified")
-    st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
+    wk = ui.q("""
+        SELECT toStartOfWeek(d.date, 1) AS week, round(sum(d.spend), 2) AS spend,
+               round(any(r.revenue), 2) AS revenue
+        FROM fct_ad_daily d
+        LEFT JOIN (SELECT toStartOfWeek(order_date, 1) AS week, sum(revenue) AS revenue FROM fct_orders
+                   WHERE platform != 'unpaid' GROUP BY week) r ON r.week = toStartOfWeek(d.date, 1)
+        GROUP BY week ORDER BY week
+    """)
+    wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
+    dates = [pd.Timestamp(d) for d in wk.week]
+    svg = ui.area_chart(dates, [("Sales from ads", wk.revenue.astype(float).tolist(), "#EB6834"),
+                                ("Ad spend", wk.spend.astype(float).tolist(), "#2A78D6")])
+    ui.chart_card("Sales and ad spend, last 6 months", "Each point is one week. Hover for the numbers.", svg,
+                  [("Sales from ads", "#EB6834", ui.money(wk.revenue.sum())),
+                   ("Ad spend", "#2A78D6", ui.money(wk.spend.sum()))])
 with c2:
     pl = ui.q("""
         WITH (SELECT max(date) FROM fct_ad_daily) AS e
@@ -174,18 +173,19 @@ with c2:
     """, (("w", window),))
     m = pl.merge(cu, on="platform", how="left").fillna(0)
     m["cac"] = (m.spend / m.customers.where(m.customers > 0)).round(2)
-    fig = go.Figure(go.Bar(x=m.platform.str.title(), y=m.cac, marker_color=[ui.PLATFORM_COLORS[p] for p in m.platform],
-                           text=[ui.money(v, 2) for v in m.cac], textposition="outside",
-                           customdata=m[["spend", "customers"]],
-                           hovertemplate="Cost per new customer $%{y:,.2f}<br>Ad spend $%{customdata[0]:,.0f}<br>"
-                                         "New customers %{customdata[1]:,.0f}<extra></extra>"))
-    fig.update_layout(title="Cost to win one new customer", showlegend=False)
-    st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
+    m = m.dropna(subset=["cac"]).sort_values("cac")
+    verdict = ""
+    if len(m) >= 2:
+        cheap, dear = m.iloc[0], m.iloc[-1]
+        verdict = (f"{cheap.platform.title()} wins customers {ui.money(dear.cac - cheap.cac, 2)} cheaper "
+                   f"than {dear.platform.title()}.")
+    ui.compare_card("Cost to win one customer", f"Last {window} days, lower is better",
+                    [(f"{r.platform.title()}, {int(r.customers):,} customers", r.cac, ui.money(r.cac, 2),
+                      ui.PLATFORM_COLORS.get(r.platform, ui.INK)) for r in m.itertuples()], verdict)
 
 # ---- Every ad, judged -----------------------------------------------------------------------------------
 ui.section("How each ad is doing", f"last {window} days")
-target = get_settings().target_cac
-sc = ui.ad_economics(window)
+sc = econ
 
 
 def verdict_for(r) -> str:
