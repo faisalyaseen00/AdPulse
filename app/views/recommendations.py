@@ -7,7 +7,7 @@ import ui
 
 from adpulse.actions import recommendations as recs
 
-ui.hero("Approvals", "Pause / scale / negative keyword suggestions. Nothing touches ad spend without a human yes.")
+ui.hero("Approvals", "Pause / scale / negative keyword suggestions. Nothing touches ad spend without a human yes.", icon="✅")
 if not ui.require_warehouse():
     st.stop()
 
@@ -36,7 +36,7 @@ pending = df[df.status == "pending"]
 approved = df[df.status == "approved"]
 ui.kpi_row([
     ui.kpi("Pending", f"{len(pending)}"),
-    ui.kpi("Est. monthly impact pending", ui.money(pending.est_impact.sum())),
+    ui.kpi("Pending impact", ui.money(pending.est_impact.sum()), note="est. per month"),
     ui.kpi("Approved, to apply", f"{len(approved)}"),
     ui.kpi("Applied", f"{(df.status == 'applied').sum()}"),
 ])

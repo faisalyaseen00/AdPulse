@@ -6,7 +6,7 @@ from adpulse import warehouse
 from adpulse.config import get_settings
 from adpulse.pipeline import demo_data, ingest, transform
 
-ui.hero("Data pipeline", "Sources → Airbyte → ClickHouse raw → modeled tables → agent.")
+ui.hero("Data pipeline", "Sources → Airbyte → ClickHouse raw → modeled tables → agent.", icon="🗄️")
 s = get_settings()
 h = warehouse.health()
 if not h.ok:

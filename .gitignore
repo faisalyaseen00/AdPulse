@@ -10,3 +10,7 @@ data/reports/
 .DS_Store
 .claude/
 .venv-*/
+
+# cloud deploy secrets (never commit)
+streamlit-secrets.toml
+.streamlit/secrets.toml

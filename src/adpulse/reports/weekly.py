@@ -6,6 +6,7 @@ otherwise a template summary is used.
 """
 from __future__ import annotations
 
+import html
 import json
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -174,12 +175,14 @@ def _template_commentary(r: WeeklyReport) -> list[str]:
 
 
 def _llm_commentary(r: WeeklyReport, llm: LLM) -> list[str]:
-    facts = pd.concat([
+    parts = [
         pd.DataFrame([{"metric": k.label, "this_week": k.value, "prior_week": k.prior} for k in r.kpis]),
         r.top_ads.assign(group="top_ads"), r.worst_ads.assign(group="worst_ads"),
-        pd.DataFrame([{"metric": "wasted_search_spend", "this_week": r.waste["wasted_spend"],
-                       "prior_week": None, "flagged_terms": r.waste["flagged"]}]),
-    ], ignore_index=True)
+        pd.DataFrame([{"metric": "wasted_search_spend", "this_week": float(r.waste["wasted_spend"]),
+                       "flagged_terms": r.waste["flagged"]}]),
+    ]
+    # skip empty frames and all-NA columns so pandas doesn't warn about dtype inference
+    facts = pd.concat([p.dropna(axis=1, how="all") for p in parts if not p.empty], ignore_index=True)
     out = llm.structured(
         system=("You write the commentary for a weekly paid-media report read by a busy head of growth. "
                 "3-4 crisp bullets: what changed, which ads to pause or scale, wasted search spend. "
@@ -249,19 +252,78 @@ def to_slack_blocks(r: WeeklyReport, app_url: str = "") -> list[dict]:
     return blocks
 
 
-def to_html(r: WeeklyReport) -> str:
-    rows = "".join(
-        f"<tr><td>{k.label}</td><td align=right><b>{k.text()}</b></td><td align=right>{k.text(k.prior)}</td>"
-        f"<td align=right style='color:{'#15803d' if k.good else '#b91c1c' if k.good is False else '#555'}'>{_arrow(k)}</td></tr>"
+def to_html(r: WeeklyReport, app_url: str = "") -> str:
+    """Email-safe HTML (tables + inline styles: renders in Gmail, Outlook, Apple Mail)."""
+    e = html.escape
+    font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif"
+
+    def delta(k: Kpi) -> str:
+        color = "#067647" if k.good else "#b42318" if k.good is False else "#667085"
+        bg = "#ecfdf3" if k.good else "#fef3f2" if k.good is False else "#f2f4f7"
+        return (f"<span style='display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;"
+                f"font-weight:600;color:{color};background:{bg}'>{e(_arrow(k))}</span>")
+
+    kpi_rows = "".join(
+        f"<tr><td style='padding:10px 12px;border-top:1px solid #eef0f3;color:#344054'>{e(k.label)}</td>"
+        f"<td align='right' style='padding:10px 12px;border-top:1px solid #eef0f3;font-weight:700;color:#0f1419'>{e(k.text())}</td>"
+        f"<td align='right' style='padding:10px 12px;border-top:1px solid #eef0f3;color:#667085'>{e(k.text(k.prior))}</td>"
+        f"<td align='right' style='padding:10px 12px;border-top:1px solid #eef0f3'>{delta(k)}</td></tr>"
         for k in r.kpis)
-    bullets = "".join(f"<li>{c}</li>" for c in r.commentary)
-    return f"""<div style="font-family:Inter,Segoe UI,Arial,sans-serif;max-width:640px;color:#111">
-<h2 style="margin:0 0 4px">AdPulse weekly report</h2>
-<div style="color:#666;margin-bottom:16px">{r.period_start:%b %d} – {r.period_end:%b %d, %Y}</div>
-<table cellpadding=6 style="border-collapse:collapse;width:100%;border:1px solid #eee">
-<tr style="background:#f6f6f8"><th align=left>Metric</th><th align=right>This week</th><th align=right>Prior</th><th align=right>Δ</th></tr>
-{rows}</table><h3>Summary</h3><ul>{bullets}</ul>
-<p><b>{len(r.pending)}</b> recommendation(s) awaiting approval. Nothing changes until a human approves.</p></div>"""
+
+    def ad_list(df: pd.DataFrame, accent: str) -> str:
+        return "".join(
+            f"<tr><td style='padding:8px 12px;border-left:3px solid {accent};background:#fafbfc'>"
+            f"<b style='color:#0f1419'>{e(str(a.ad_name))}</b> <span style='color:#667085'>· {e(str(a.platform).title())}</span><br>"
+            f"<span style='color:#475467;font-size:13px'>CAC ${a.cac:,.2f} · avg LTV ${a.avg_ltv:,.2f} · "
+            f"LTV:CAC <b>{a.ltv_to_cac:.2f}</b></span></td></tr><tr><td style='height:6px'></td></tr>"
+            for a in df.itertuples())
+
+    def block(title: str, body: str) -> str:
+        return (f"<tr><td style='padding:22px 28px 0'><div style='font-size:15px;font-weight:700;color:#0f1419;"
+                f"margin-bottom:10px'>{e(title)}</div>{body}</td></tr>")
+
+    parts = [block("Summary", "<ul style='margin:0;padding-left:18px;color:#344054;line-height:1.6'>"
+                   + "".join(f"<li>{e(c)}</li>" for c in r.commentary) + "</ul>")]
+    if not r.top_ads.empty:
+        parts.append(block("Scale candidates (best LTV:CAC)",
+                           f"<table width='100%' cellpadding='0' cellspacing='0'>{ad_list(r.top_ads, '#12b76a')}</table>"))
+    if not r.worst_ads.empty:
+        parts.append(block("Pause candidates (worst LTV:CAC)",
+                           f"<table width='100%' cellpadding='0' cellspacing='0'>{ad_list(r.worst_ads, '#f04438')}</table>"))
+    terms = "".join(
+        f"<tr><td style='padding:7px 0;border-top:1px solid #eef0f3;color:#344054'>{e(str(t.search_term))}"
+        f" <span style='color:#667085;font-size:12px'>({e(str(t.intent))})</span></td>"
+        f"<td align='right' style='padding:7px 0;border-top:1px solid #eef0f3;color:#b42318;font-weight:600'>${t.cost:,.2f}</td>"
+        f"<td align='right' style='padding:7px 0 7px 10px;border-top:1px solid #eef0f3;color:#475467;font-size:12px'>"
+        f"negative {e(str(t.suggested_negative))}</td></tr>" for t in r.top_waste_terms.itertuples())
+    parts.append(block(
+        f"Search term waste: ${r.waste['wasted_spend']:,.2f} on {r.waste['flagged']} terms "
+        f"({r.waste['wasted_share']:.0%} of search spend)",
+        f"<table width='100%' cellpadding='0' cellspacing='0' style='font-size:14px'>{terms}</table>"))
+    cta = (f"<a href='{e(app_url.rstrip('/'))}/recommendations' style='display:inline-block;background:#2a78d6;"
+           f"color:#ffffff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:10px'>"
+           f"Review {len(r.pending)} pending approval(s)</a>") if app_url else ""
+    source = "AI-written, every number checked against the data" if r.commentary_source == "llm" else "template"
+
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f4f5f7">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;{font}"><tr><td align="center" style="padding:24px 12px">
+<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #e6e8ec;border-radius:16px;overflow:hidden;{font};font-size:14px">
+<tr><td style="background:linear-gradient(120deg,#2a78d6,#5b5bd6);background-color:#2a78d6;padding:22px 28px;color:#ffffff">
+  <div style="font-size:13px;opacity:.85;letter-spacing:.04em;text-transform:uppercase">AdPulse · weekly report</div>
+  <div style="font-size:22px;font-weight:700;margin-top:4px">{r.period_start:%b %d} – {r.period_end:%b %d, %Y}</div></td></tr>
+<tr><td style="padding:20px 28px 0"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:12px;font-size:14px">
+  <tr style="background:#f8f9fb"><th align="left" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Metric</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">This week</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Prior</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Change</th></tr>{kpi_rows}</table></td></tr>
+{"".join(parts)}
+<tr><td style="padding:24px 28px">
+  <div style="background:#fffaeb;border:1px solid #fedf89;border-radius:12px;padding:12px 14px;color:#7a2e0e">
+  <b>{len(r.pending)} recommendation(s) awaiting approval.</b> Nothing changes in your ad accounts until a human approves.</div>
+  <div style="margin-top:16px">{cta}</div></td></tr>
+<tr><td style="padding:14px 28px;border-top:1px solid #eef0f3;color:#98a2b3;font-size:12px">
+  Commentary: {source}. Sent by AdPulse.</td></tr>
+</table></td></tr></table></body></html>"""
 
 
 def save(r: WeeklyReport, channels: list[str], status: str) -> None:
@@ -287,7 +349,7 @@ def deliver(r: WeeklyReport, slack: bool = True, email: bool = True) -> dict[str
         results["slack"] = delivery.send_slack(r, s) if s.slack_configured else "skipped: Slack not configured"
     if email:
         results["email"] = delivery.send_email(r, s) if s.email_configured else "skipped: email not configured"
-    sent = [k for k, v in results.items() if v == "sent"]
+    sent = [k for k, v in results.items() if v.startswith("sent")]
     failed = [k for k, v in results.items() if v.startswith("error")]
     save(r, sent, "failed" if failed and not sent else ("sent" if sent else "generated"))
     return results

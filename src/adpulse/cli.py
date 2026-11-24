@@ -73,6 +73,37 @@ def setup(mode: str = typer.Option("direct", help="auto | airbyte | direct")):
 
 
 @app.command()
+def bootstrap(wait: int = typer.Option(120, help="Seconds to wait for ClickHouse")):
+    """Server start-up: wait for ClickHouse, create schema + read-only user, load demo data only if empty."""
+    import time
+
+    from . import warehouse
+    deadline = time.monotonic() + wait
+    while not (h := warehouse.ping()).ok:
+        if "authentication" in h.error.lower() or time.monotonic() > deadline:
+            console.print(f"[red]ClickHouse not reachable:[/] {h.error[:300]}")
+            raise typer.Exit(1)
+        time.sleep(2)
+    warehouse.init_db()
+    console.print("[green]✓[/] schema and read-only user ready")
+    try:
+        n = int(warehouse.query_df("SELECT count() AS n FROM fct_ad_daily").iloc[0]["n"])
+    except Exception:  # noqa: BLE001
+        n = 0
+    if n:
+        console.print(f"[green]✓[/] warehouse already has data ({n:,} ad-day rows), nothing to load")
+        return
+    console.print("empty warehouse: loading the demo dataset")
+    from .pipeline import ingest as ing
+    from .pipeline import transform as tr
+    if not (get_settings().demo_dir / "meta_ads_insights.csv").exists():
+        demo_data()
+    ing.ingest("direct", progress=console.print)
+    tr.run_models(progress=console.print)
+    recommend()
+
+
+@app.command()
 def ask(question: str):
     """Ask the agent a question in plain English."""
     from .agent.core import AdPulseAgent
@@ -121,16 +152,44 @@ def recommend(window: int = 30):
 
 
 @app.command()
-def report(send: bool = typer.Option(False, help="Deliver to Slack / email"), days: int = 7):
-    """Build the weekly report (and optionally send it)."""
+def report(send: bool = typer.Option(False, help="Deliver the report"), days: int = 7,
+           slack: bool = typer.Option(True, help="Include Slack when sending"),
+           email: bool = typer.Option(True, help="Include email when sending")):
+    """Build the weekly report (and optionally send it): `adpulse report --send --no-slack` emails only."""
     from .reports import weekly
     rep = weekly.build(days=days, llm=_llm_or_none())
     console.print(Markdown(weekly.to_markdown(rep)))
     if send:
-        for ch, res in weekly.deliver(rep).items():
+        results = weekly.deliver(rep, slack=slack, email=email)
+        for ch, res in results.items():
             console.print(f"  {ch}: {res}")
+        if any(v.startswith("error") for v in results.values()):
+            raise typer.Exit(1)
     else:
         weekly.save(rep, [], "generated")
+
+
+@app.command()
+def scheduler(once: bool = typer.Option(False, help="Run the weekly job now and exit"),
+              dry_run: bool = typer.Option(False, help="With --once: build and save, but don't send"),
+              show: bool = typer.Option(False, "--next", help="Print the next scheduled run and exit")):
+    """Send the weekly report on schedule (REPORT_SCHEDULE_DAY / _TIME / REPORT_TIMEZONE). Runs until stopped."""
+    from datetime import datetime, timezone
+
+    from . import scheduler as sch
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    sched = sch.Schedule.from_settings()
+    if show:
+        console.print(f"schedule: {sched.describe()}\nnext run: {sched.next_run(datetime.now(timezone.utc)):%A %Y-%m-%d %H:%M %Z}")
+        return
+    if once:
+        res = sch.run_weekly(send=not dry_run)
+        for ch, r in res.items():
+            console.print(f"  {ch}: {r}")
+        if any(v.startswith("error") for v in res.values()):
+            raise typer.Exit(1)
+        return
+    sch.serve()
 
 
 @app.command()

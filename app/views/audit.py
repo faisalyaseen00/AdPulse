@@ -7,7 +7,7 @@ from adpulse.audit import search_terms
 from adpulse.config import get_settings
 from adpulse.llm import LLMError, get_llm
 
-ui.hero("Search term audit", "What people actually typed before you paid for the click, and which terms have no buyer intent.")
+ui.hero("Search term audit", "What people actually typed before you paid for the click, and which terms have no buyer intent.", icon="🔎")
 if not ui.require_warehouse():
     st.stop()
 
@@ -59,7 +59,7 @@ with right:
         "campaign_name": "Campaign", "wasted_spend": st.column_config.NumberColumn("Wasted", format="$%.2f")})
 
 with left:
-    st.markdown("##### Flagged terms")
+    ui.section("Flagged terms")
     st.caption("Tick the terms to block, then queue them. Negatives are only added after approval.")
     flagged = df[df.flagged].copy()
     flagged.insert(0, "queue", True)

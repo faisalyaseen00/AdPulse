@@ -65,6 +65,22 @@ The Claude client uses structured outputs, prompt caching on the large schema pr
 server-side refusal fallback (`ANTHROPIC_FALLBACKS=true`). Without a key, every page except chat
 still works: dashboards, the audit (rules only), approvals and reports (template commentary).
 
+### Weekly report: Slack, email and the Monday schedule
+
+- **Slack:** set `SLACK_WEBHOOK_URL` (Incoming Webhook) or `SLACK_BOT_TOKEN` + `SLACK_CHANNEL`. If the bot
+  token fails, delivery falls back to the webhook.
+- **Email (Gmail):** create an App Password at <https://myaccount.google.com/apppasswords> (needs 2-Step
+  Verification), then run `scripts/setup_email.sh`. It writes `SMTP_*` / `REPORT_EMAIL_*` to `.env` without
+  echoing the password. Other providers: set `SMTP_HOST`, `SMTP_PORT` and `SMTP_SECURITY`
+  (`starttls` on 587, `ssl` on 465).
+- **Test:** `adpulse report --send --no-slack` (email only) or `--no-email` (Slack only).
+- **Schedule:** `adpulse scheduler` runs until stopped and sends the report every
+  `REPORT_SCHEDULE_DAY` at `REPORT_SCHEDULE_TIME` in `REPORT_TIMEZONE` (default Monday 08:00). Each run
+  refreshes the pause/scale suggestions first. If the process was down at the scheduled time, it catches up
+  on start (within `REPORT_CATCHUP_HOURS`, default 12) unless a report was already sent.
+  `adpulse scheduler --next` shows the next run; `--once` runs the job now (`--dry-run` builds without
+  sending). With Docker, the `scheduler` service in `docker-compose.yml` does this with `restart: unless-stopped`.
+
 ### Real Airbyte connectors
 
 ```bash
@@ -88,9 +104,21 @@ adpulse sync --mode airbyte   init-db + ingest + transform
 adpulse ask "which ads brought customers with the highest LTV last month?"
 adpulse audit --days 30 --save
 adpulse recommend
-adpulse report --send         schedule with cron: 0 8 * * MON
+adpulse report --send         Slack + email now (--no-slack / --no-email to pick one)
+adpulse scheduler             send the weekly report on schedule (--next, --once, --dry-run)
 adpulse ui
 ```
+
+## Deploy
+
+**Free, no server:** Streamlit Community Cloud (app) + ClickHouse Cloud (database, 30-day trial) + GitHub Actions
+(Monday report). `scripts/cloud_setup.py` loads the data and writes the secrets to paste. Guide:
+[docs/deploy-streamlit-cloud.md](docs/deploy-streamlit-cloud.md).
+
+**Own server:** one command on a fresh Ubuntu server (Oracle Cloud Always Free works: 4 CPU / 24 GB, no charge):
+`scripts/server_install.sh`. It installs Docker, generates strong database passwords, asks for your keys, and
+starts ClickHouse (localhost only), the app on port 8501, and the Monday report scheduler. The first start
+loads the demo data via `adpulse bootstrap`. Full walkthrough: [docs/deploy-server.md](docs/deploy-server.md).
 
 ## Demo data
 

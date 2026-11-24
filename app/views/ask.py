@@ -2,7 +2,6 @@ import html
 import numbers
 
 import pandas as pd
-
 import plotly.express as px
 import streamlit as st
 import ui
@@ -20,7 +19,7 @@ SUGGESTIONS = [
     "Compare Meta vs Google: spend, new customers and 90-day LTV this quarter",
 ]
 
-ui.hero("Ask AdPulse", "Plain-English questions → SQL → warehouse math → critic review → verified answer.")
+ui.hero("Ask AdPulse", "Plain-English questions → SQL → warehouse math → critic review → verified answer.", icon="💬")
 if not ui.require_warehouse():
     st.stop()
 
@@ -54,10 +53,10 @@ def render_answer(a: AgentAnswer, idx: int) -> None:
         (f"{ok}/{n} numbers traced to data", "good" if n == ok else "bad"),
         (f"{len(a.data)} rows", "muted"), (f"{a.latency_ms / 1000:.1f}s · {a.attempts} SQL attempt(s)", "muted"),
     )
-    st.markdown(f"#### {a.headline}")
-    st.markdown(a.answer_markdown)
+    st.markdown(ui.md(f"#### {a.headline}"))
+    st.markdown(ui.md(a.answer_markdown))
     if a.caveats:
-        st.caption("Caveats: " + " · ".join(a.caveats))
+        st.caption(ui.md("Caveats: " + " · ".join(a.caveats)))
     if a.critic and a.critic.verdict == "fail":
         st.warning("The critic still had concerns: " + "; ".join(a.critic.issues))
 
@@ -73,7 +72,7 @@ def render_answer(a: AgentAnswer, idx: int) -> None:
         if a.assumptions:
             st.caption("Assumptions: " + " · ".join(a.assumptions))
     with tabs[3]:
-        st.markdown(f"**Plan.** {a.reasoning}")
+        st.markdown(ui.md(f"**Plan.** {a.reasoning}"))
         render_steps(a)
     with tabs[4]:
         if not a.number_checks:
@@ -120,7 +119,7 @@ def render_chart(a: AgentAnswer) -> None:
         return
     color = c.color if c.color in df.columns else None
     cmap = ui.PLATFORM_COLORS if color == "platform" else None
-    kw = dict(x=c.x, y=c.y, color=color, color_discrete_map=cmap, color_discrete_sequence=ui.SERIES)
+    kw = {"x": c.x, "y": c.y, "color": color, "color_discrete_map": cmap, "color_discrete_sequence": ui.SERIES}
     if c.type == "line":
         fig = px.line(df, **kw)
     elif c.type == "scatter":
@@ -143,21 +142,25 @@ def render_chart(a: AgentAnswer) -> None:
 
 # ------------------------------------------------------------------ chat
 if not chat:
-    st.markdown("**Try one of these:**")
-    cols = st.columns(len(SUGGESTIONS[:3]))
-    for col, s in zip(cols, SUGGESTIONS[:3]):
-        if col.button(s, width="stretch"):
-            st.session_state.pending_q = s
-            st.rerun()
-    cols = st.columns(len(SUGGESTIONS[3:]))
-    for col, s in zip(cols, SUGGESTIONS[3:]):
-        if col.button(s, width="stretch"):
-            st.session_state.pending_q = s
-            st.rerun()
+    st.html('<div class="ap-how">' + "".join(
+        f'<div class="st"><div class="n">{n}</div><div><div class="h">{h}</div><div class="d">{d}</div></div></div>'
+        for n, h, d in [
+            ("1", "Writes SQL", "The model plans a ClickHouse query from the semantic layer."),
+            ("2", "Guards it", "Only SELECTs on allowed tables, run as a read-only user."),
+            ("3", "Warehouse does the math", "Every figure comes from ClickHouse, not the model."),
+            ("4", "Critic + number check", "A second pass reviews the logic; every number is traced to the data."),
+        ]) + "</div>")
+    ui.section("Try a question")
+    for i in range(0, len(SUGGESTIONS), 2):
+        cols = st.columns(2)
+        for col, s in zip(cols, SUGGESTIONS[i:i + 2]):
+            if col.button(s, width="stretch", icon=":material/arrow_outward:", key=f"sugg_{i}_{s[:12]}"):
+                st.session_state.pending_q = s
+                st.rerun()
 
 for i, a in enumerate(chat):
     with st.chat_message("user"):
-        st.markdown(a.question)
+        st.markdown(ui.md(a.question))
     with st.chat_message("assistant", avatar="📈"):
         render_answer(a, i)
 
@@ -165,7 +168,7 @@ question = st.chat_input("Ask about spend, CAC, LTV, ROAS, campaigns, search ter
 question = question or st.session_state.pop("pending_q", None)
 if question:
     with st.chat_message("user"):
-        st.markdown(question)
+        st.markdown(ui.md(question))
     with st.chat_message("assistant", avatar="📈"):
         history = [Turn(a.question, a.sql, a.headline) for a in chat if a.ok]
         try:
@@ -178,7 +181,6 @@ if question:
         chat.append(ans)
         render_answer(ans, len(chat) - 1)
 
-if chat:
-    if st.button("Clear conversation", type="tertiary"):
-        st.session_state.chat = []
-        st.rerun()
+if chat and st.button("Clear conversation", type="tertiary"):
+    st.session_state.chat = []
+    st.rerun()

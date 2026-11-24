@@ -1,0 +1,2 @@
+# Used by Streamlit Community Cloud: installs AdPulse itself (and its dependencies from pyproject.toml).
+-e .

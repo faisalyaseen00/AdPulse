@@ -5,12 +5,14 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install .
+# editable install keeps the package under /app, so PROJECT_ROOT (data/, .env) resolves to /app
+RUN pip install --upgrade pip && pip install -e .
 
 COPY app ./app
 COPY .streamlit ./.streamlit
 
 RUN useradd --create-home adpulse && mkdir -p /app/data && chown -R adpulse /app
+ENV DATA_DIR=/app/data
 USER adpulse
 
 EXPOSE 8501

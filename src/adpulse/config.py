@@ -50,11 +50,19 @@ class Settings(BaseSettings):
     slack_webhook_url: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
+    smtp_security: str = "starttls"  # starttls (port 587) | ssl (port 465) | none (local relay)
     smtp_user: str = ""
     smtp_password: str = ""
     report_email_from: str = ""
     report_email_to: str = ""
     app_base_url: str = "http://localhost:8501"
+
+    # Weekly report schedule (`adpulse scheduler`)
+    report_schedule_day: str = "mon"
+    report_schedule_time: str = "08:00"
+    report_timezone: str = "UTC"
+    report_catchup_hours: int = 12  # send a missed report if the process was down at the slot
+    report_sync_first: bool = False  # re-sync sources before the report (turn on with live connectors)
 
     # Decision rules
     target_roas: float = 2.0

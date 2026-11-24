@@ -39,7 +39,7 @@ class _Hook(BaseHTTPRequestHandler):
     status = 200
     received: list = []
 
-    def do_POST(self):  # noqa: N802
+    def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"]))
         _Hook.received.append(json.loads(body))
         self.send_response(_Hook.status)

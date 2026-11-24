@@ -45,3 +45,7 @@ markers = ["integration: needs a running ClickHouse"]
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint.per-file-ignores]
+# tests deliberately use broad excepts for cleanup and simple stub servers
+"tests/*" = ["BLE001", "S110", "B017", "RUF012"]

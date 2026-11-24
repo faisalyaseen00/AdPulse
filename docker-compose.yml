@@ -1,31 +1,69 @@
+# AdPulse full stack: ClickHouse + web app + weekly report scheduler.
+#   docker compose up -d --build        (first start also loads the demo data via the "init" service)
+# Secrets come from .env (scripts/server_install.sh generates strong ones).
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     container_name: adpulse-clickhouse
+    restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-adpulse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-adpulse}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-adpulse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"   # lets the app create the read-only agent user
-    ports: ["8123:8123", "9000:9000"]
+    # Only reachable from this machine (and the other containers). Never expose the database publicly.
+    ports: ["127.0.0.1:8123:8123", "127.0.0.1:9000:9000"]
     volumes: [ch_data:/var/lib/clickhouse]
     ulimits: { nofile: { soft: 262144, hard: 262144 } }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
       interval: 5s
-      retries: 20
+      retries: 30
+
+  # One-shot: schema + read-only user, and the demo dataset if the warehouse is empty. Safe to re-run.
+  init:
+    image: adpulse-app
+    build: .
+    command: ["adpulse", "bootstrap"]
+    env_file: .env
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+    healthcheck: { disable: true }
+    depends_on:
+      clickhouse: { condition: service_healthy }
+    volumes: [app_data:/app/data]
+    restart: "no"
 
   app:
+    image: adpulse-app
     build: .
     container_name: adpulse-app
     env_file: .env
     environment:
       CLICKHOUSE_HOST: clickhouse
-    ports: ["8501:8501"]
+    ports: ["${APP_PORT:-8501}:8501"]
     depends_on:
-      clickhouse: { condition: service_healthy }
-    volumes: [./data:/app/data]
+      init: { condition: service_completed_successfully }
+    volumes: [app_data:/app/data]
+    restart: unless-stopped
+
+  # Sends the weekly report on schedule (REPORT_SCHEDULE_DAY / _TIME / REPORT_TIMEZONE in .env)
+  scheduler:
+    image: adpulse-app
+    build: .
+    container_name: adpulse-scheduler
+    command: ["adpulse", "scheduler"]
+    healthcheck: { disable: true }   # the image's healthcheck probes the web UI, which this service doesn't run
+    env_file: .env
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+    depends_on:
+      init: { condition: service_completed_successfully }
+    volumes: [app_data:/app/data]
+    restart: unless-stopped
 
 volumes:
   ch_data:
     name: adpulse_ch_data
+  app_data:
+    name: adpulse_app_data

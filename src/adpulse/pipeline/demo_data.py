@@ -199,7 +199,7 @@ def generate(out_dir: Path, days: int = 180, end: date | None = None, seed: int 
                                   "campaign_name": ad.campaign_name, "adset_id": ad.group_id,
                                   "adset_name": ad.group_name, "ad_id": ad.ad_id, "ad_name": ad.ad_name,
                                   "impressions": impressions, "clicks": clicks, "spend": spend,
-                                  "purchases": int(round(n_first * inflation))})
+                                  "purchases": round(n_first * inflation)})
             else:
                 gads_rows.append({"date": day, "customer_id": "123-456-7890", "campaign_id": ad.campaign_id,
                                   "campaign_name": ad.campaign_name, "campaign_type": ad.campaign_type,

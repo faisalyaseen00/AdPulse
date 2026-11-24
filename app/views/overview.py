@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import ui
 
-ui.hero("Overview", "Ads → clicks → customers → revenue → lifetime value, from the warehouse.")
+ui.hero("Overview", "Ads → clicks → customers → revenue → lifetime value, from the warehouse.", icon="📊")
 if not ui.require_warehouse():
     st.stop()
 
@@ -45,7 +45,7 @@ ui.kpi_row([
     ui.kpi("90-day LTV", ui.money(k.ltv90, 2), note="mature paid customers"),
 ])
 
-st.markdown("##### Funnel")
+ui.section("Funnel", "paid traffic, same window")
 flow = [("Impressions", f"{k.impressions:,.0f}", ""), ("Clicks", f"{k.clicks:,.0f}",
         f"CTR {k.clicks / k.impressions:.2%}" if k.impressions else ""),
         ("Sessions", f"{k.sessions:,.0f}", f"{k.sessions / k.clicks:.0%} of clicks" if k.clicks else ""),
@@ -68,9 +68,9 @@ with c1:
     wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=wk.week, y=wk.spend, name="Ad spend", mode="lines",
-                             line=dict(color=ui.SERIES[0], width=2), hovertemplate="$%{y:,.0f}"))
+                             line={"color": ui.SERIES[0], "width": 2}, hovertemplate="$%{y:,.0f}"))
     fig.add_trace(go.Scatter(x=wk.week, y=wk.revenue, name="Attributed revenue", mode="lines",
-                             line=dict(color=ui.SERIES[1], width=2), hovertemplate="$%{y:,.0f}"))
+                             line={"color": ui.SERIES[1], "width": 2}, hovertemplate="$%{y:,.0f}"))
     fig.update_layout(title="Weekly spend vs. attributed revenue", hovermode="x unified")
     st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
 with c2:
@@ -94,9 +94,8 @@ with c2:
     fig.update_layout(title="CAC by platform", showlegend=False)
     st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
 
-st.markdown("##### Ad scorecard")
-st.caption(f"Spend and CAC over the last {window} days. LTV is the 90-day value of each ad's mature customers "
-           "(or lifetime value when none are 90 days old yet).")
+ui.section("Ad scorecard", f"spend and CAC over the last {window} days")
+st.caption("LTV is the 90-day value of each ad's mature customers (or lifetime value when none are 90 days old yet).")
 from adpulse.actions.recommendations import ad_economics
 
 sc = ad_economics(window)

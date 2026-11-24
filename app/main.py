@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import streamlit as st
 
-st.set_page_config(page_title="AdPulse", page_icon="📈", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AdPulse", page_icon=str(Path(__file__).parent / "assets" / "icon.svg"), layout="wide", initial_sidebar_state="expanded")
 
 import ui
 
@@ -15,6 +16,7 @@ from adpulse.config import get_settings
 logging.basicConfig(level=logging.INFO)
 ui.inject_css()
 settings = get_settings()
+
 
 pages = {
     "Analyze": [
@@ -33,18 +35,22 @@ pages = {
 }
 nav = st.navigation(pages)
 
+ASSETS = Path(__file__).parent / "assets"
+st.logo(str(ASSETS / "logo.svg"), size="large", icon_image=str(ASSETS / "icon.svg"))
+
 with st.sidebar:
-    st.markdown("### 📈 AdPulse")
-    st.caption("Marketing data agent on ClickHouse")
-    st.text_input("Reviewer name", key="reviewer", placeholder="Required to approve actions",
-                  help="Recorded on every approve / reject decision.")
     h = warehouse.health()
-    items = [("ClickHouse " + (h.version.split(".")[0] + "." + h.version.split(".")[1] if h.ok else "offline"),
-              "good" if h.ok else "bad"),
-             (settings.llm_label if settings.llm_configured else "LLM not configured",
-              "info" if settings.llm_configured else "warn"),
-             ("Slack ready" if settings.slack_configured else "Slack off", "good" if settings.slack_configured else "muted")]
-    ui.badges(*items)
-    st.caption("Suggestions never change ad spend. Every action needs human approval.")
+    st.html('<div class="ap-side-label">System</div>')
+    ui.status_list(
+        ("ClickHouse " + (".".join(h.version.split(".")[:2]) if h.ok else "offline"), "good" if h.ok else "bad"),
+        (settings.llm_label if settings.llm_configured else "LLM not configured",
+         "info" if settings.llm_configured else "warn"),
+        ("Slack connected" if settings.slack_configured else "Slack off",
+         "good" if settings.slack_configured else "muted"),
+    )
+    st.html('<div class="ap-side-label">Reviewer</div>')
+    st.text_input("Reviewer name", key="reviewer", placeholder="Your name (needed to approve)",
+                  label_visibility="collapsed", help="Recorded on every approve / reject decision.")
+    st.caption("🔒 Suggestions never change ad spend on their own. Every action needs human approval.")
 
 nav.run()

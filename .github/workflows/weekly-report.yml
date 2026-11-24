@@ -1,0 +1,51 @@
+# Sends the AdPulse weekly report every Monday (free on GitHub Actions for public repos).
+# Needs one repository secret, ADPULSE_SECRETS: the contents of streamlit-secrets.toml
+# (written by scripts/cloud_setup.py). Run it by hand from the Actions tab with "Run workflow".
+name: Weekly report
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"   # Monday 03:00 UTC = 08:00 Pakistan time (GitHub may start it a few minutes late)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the report but don't send it"
+        type: boolean
+        default: false
+
+concurrency: { group: weekly-report, cancel-in-progress: false }
+permissions: { contents: read }
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - run: pip install -e .
+      - name: Load secrets
+        env: { ADPULSE_SECRETS: "${{ secrets.ADPULSE_SECRETS }}" }
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          raw = os.environ.get("ADPULSE_SECRETS", "")
+          if not raw.strip():
+              raise SystemExit("Repository secret ADPULSE_SECRETS is missing (see docs/deploy-streamlit-cloud.md)")
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              for k, v in tomllib.loads(raw).items():
+                  v = str(v)
+                  if "\n" in v:
+                      raise SystemExit(f"{k}: multi-line values are not supported")
+                  if any(s in k for s in ("PASSWORD", "KEY", "TOKEN", "WEBHOOK")):
+                      print(f"::add-mask::{v}")
+                  env.write(f"{k}={v}\n")
+          PY
+      - name: Send weekly report
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            adpulse scheduler --once --dry-run
+          else
+            adpulse scheduler --once
+          fi

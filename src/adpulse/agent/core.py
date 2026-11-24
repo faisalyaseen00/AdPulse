@@ -180,7 +180,7 @@ class AdPulseAgent:
             t = time.perf_counter()
             try:
                 df = warehouse.run_untrusted(plan.sql)
-            except Exception as e:  # noqa: BLE001 - DB error text goes back to the model
+            except Exception as e:  # noqa: BLE001
                 msg = _short_db_error(e)
                 ans.steps.append(Step("run in ClickHouse", "retry", msg, _ms(t)))
                 error_feedback = (f"\n\nYour previous SQL failed in ClickHouse:\n```sql\n{plan.sql}\n```\n"
