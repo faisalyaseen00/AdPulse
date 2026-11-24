@@ -6,7 +6,6 @@ import streamlit as st
 import ui
 
 from adpulse import plain
-from adpulse.actions import recommendations as recs
 from adpulse.audit import search_terms
 from adpulse.config import get_settings
 
@@ -65,7 +64,7 @@ ui.verdict(f"Your ads brought back <b>{plain.per_dollar(roas)}</b> for every $1 
 
 # ---- Numbers at a glance --------------------------------------------------------------------------------
 ui.kpi_row([
-    ui.kpi(plain.label("spend"), ui.money(k.spend), chg(k.spend, k.spend_p), "down", help=plain.explain("spend"),
+    ui.kpi(plain.label("spend"), ui.money(k.spend), chg(k.spend, k.spend_p), "neutral", help=plain.explain("spend"),
            period=period),
     ui.kpi(plain.label("paid_revenue"), ui.money(k.rev), chg(k.rev, k.rev_p), help=plain.explain("paid_revenue"),
            period=period),
@@ -83,7 +82,7 @@ def wasted(days: int) -> dict:
     return search_terms.summary(search_terms.audit(days, llm=None))
 
 
-pending = recs.latest()
+pending = ui.suggestions()
 pending = pending[pending.status == "pending"] if not pending.empty else pending
 items = []
 if not pending.empty:
@@ -176,7 +175,7 @@ with c2:
 # ---- Every ad, judged -----------------------------------------------------------------------------------
 ui.section("How each ad is doing", f"last {window} days")
 target = get_settings().target_cac
-sc = recs.ad_economics(window)
+sc = ui.ad_economics(window)
 
 
 def verdict_for(r) -> str:

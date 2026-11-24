@@ -136,6 +136,11 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stCaptionContainer"] { color: var(--muted); }
 
+.ap-impact { text-align: right; margin: 2px 0 10px; }
+.ap-impact .n { font-family: var(--display); font-weight: 750; font-size: 1.7rem; color: var(--ink);
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ap-impact .c { font-size: .82rem; color: var(--muted); }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: .8rem; line-height: 1.45; }
 .ap-card-title { font-family: var(--display); font-weight: 650; font-size: 1.15rem; color: var(--ink); }
 .ap-muted { color: var(--muted); font-size: .92rem; }
 .ap-why { color: var(--ink-2); font-size: 1rem; line-height: 1.55; margin: 8px 0 6px; }
@@ -163,6 +168,7 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
   .ap-head h1 { font-size: 1.6rem; }
   .ap-todo .t { grid-template-columns: 6px 1fr; } .ap-todo .n { grid-column: 2; }
   .ap-gloss { grid-template-columns: 1fr; }
+  .ap-impact { text-align: left; }
 }
 </style>
 """
@@ -264,7 +270,7 @@ def change_text(delta: float | None, better: str = "up", period: str = "") -> st
     if abs(delta) < 0.0005:
         cls, word = "flat", "No change"
     else:
-        cls = "up" if (delta > 0) == (better == "up") else "down"
+        cls = "flat" if better == "neutral" else ("up" if (delta > 0) == (better == "up") else "down")
         word = f"{'▲' if delta > 0 else '▼'} {abs(delta):.1%}"
     return f'<span class="{cls}">{word}</span>' + (f" vs {html.escape(period)}" if period else "")
 
@@ -298,17 +304,63 @@ def style_fig(fig: go.Figure, height: int = 320, money_axis: bool = False) -> go
     return fig
 
 
+# ---- Cached data access -----------------------------------------------------------------------------------
+# The live app talks to a cloud database; every round trip costs 0.2–1.5 s. Cache what doesn't change between
+# clicks, and clear the relevant cache right after anything is written.
+
 @st.cache_data(ttl=120, show_spinner=False)
 def q(sql: str, params: tuple = ()) -> pd.DataFrame:
     return warehouse.query_df(sql, dict(params))
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _health():
+    return warehouse.health()
+
+
+def health():
+    h = _health()
+    if not h.ok:
+        _health.clear()  # never cache an outage: try again on the next click
+    return h
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _has_data() -> bool:
+    try:
+        return bool(warehouse.query_df("SELECT count() AS n FROM fct_ad_daily").iloc[0]["n"])
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def suggestions(status: str | None = None) -> pd.DataFrame:
+    from adpulse.actions import recommendations as recs
+    return recs.latest(status)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def ad_economics(window: int) -> pd.DataFrame:
+    from adpulse.actions import recommendations as recs
+    return recs.ad_economics(window)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def table_counts() -> pd.DataFrame:
+    return warehouse.table_counts()
+
+
+def suggestions_changed() -> None:
+    """Call after saving or deciding a suggestion, so every page shows it straight away."""
+    suggestions.clear()
+
+
 def clear_cache() -> None:
-    q.clear()
+    st.cache_data.clear()
 
 
 def require_warehouse() -> bool:
-    h = warehouse.health()
+    h = health()
     if not h.ok:
         s = get_settings()
         if s.clickhouse_host in ("localhost", "127.0.0.1") and Path("/mount/src").exists():
@@ -319,11 +371,8 @@ def require_warehouse() -> bool:
                  f"Technical detail: could not connect to `{s.clickhouse_host}:{s.clickhouse_port}` "
                  f"({h.error[:160]})")
         return False
-    try:
-        n = warehouse.query_df("SELECT count() AS n FROM fct_ad_daily").iloc[0]["n"]
-    except Exception:  # noqa: BLE001
-        n = 0
-    if not n:
+    if not _has_data():
+        _has_data.clear()
         st.warning("**No data loaded yet.** Open **Data status** and click **Load data now**.")
         return False
     return True

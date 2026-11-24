@@ -8,17 +8,17 @@ from adpulse.pipeline import demo_data, ingest, transform
 
 ui.hero("Data status", "Where your numbers come from, and how fresh they are.")
 s = get_settings()
-h = warehouse.health()
+h = ui.health()
 if not h.ok:
     ui.require_warehouse()
     st.stop()
 
-counts = warehouse.table_counts()
+counts = ui.table_counts()
 rows = dict(zip(counts.table, counts.rows))
 raw_rows = sum(int(v or 0) for k, v in rows.items() if k.startswith("raw_"))
 
 try:
-    fresh = warehouse.query_df("""
+    fresh = ui.q("""
         SELECT 'Meta ads' AS source, toString(max(date)) AS latest FROM raw_meta_ads_insights
         UNION ALL SELECT 'Google ads', toString(max(date)) FROM raw_google_ads_ad_performance
         UNION ALL SELECT 'Google searches', toString(max(date)) FROM raw_google_ads_search_terms

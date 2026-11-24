@@ -88,7 +88,7 @@ def render_answer(a: AgentAnswer, idx: int) -> None:
 
     if a.suggested_actions:
         st.markdown("**Suggested next steps.** Add one to your suggestions list; nothing changes until you approve it.")
-        econ = recs.ad_economics(30).set_index("ad_name")
+        econ = ui.ad_economics(30).set_index("ad_name")
         for j, s in enumerate(a.suggested_actions):
             c1, c2 = st.columns([5, 1.3])
             kind = {"pause_ad": ("Pause this ad", "bad"), "scale_ad": ("Give it more budget", "good"),
@@ -106,6 +106,7 @@ def render_answer(a: AgentAnswer, idx: int) -> None:
                     s.action, s.platform, "" if row is None else row["ad_id"], s.ad_name,
                     "" if row is None else row["campaign_name"], f"From chat: {s.rationale}",
                     metrics | {"question": a.question}, float(metrics.get("spend_window") or 0), source="agent")])
+                ui.suggestions_changed()
                 st.session_state[key + "_done"] = True
                 st.toast("Added to suggestions" if n_new else "Already in your suggestions", icon="✅")
 

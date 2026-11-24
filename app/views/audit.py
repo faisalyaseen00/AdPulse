@@ -90,6 +90,7 @@ with left:
     if b1.button(f"Add {len(chosen)} search(es) to suggestions", type="primary", disabled=not chosen,
                  width="stretch"):
         n = recs.save(recs.audit_recommendations(df, chosen))
+        ui.suggestions_changed()
         st.success(f"Added {n} search(es) to **Suggestions**"
                    + ("." if n == len(chosen) else f" ({len(chosen) - n} were already there)."))
     b2.download_button("Download all searches (CSV)", df.to_csv(index=False), f"wasted_searches_{days}d.csv",

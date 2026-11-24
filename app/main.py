@@ -35,7 +35,6 @@ _load_streamlit_secrets()
 
 import ui
 
-from adpulse import warehouse
 from adpulse.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -64,7 +63,7 @@ ASSETS = Path(__file__).parent / "assets"
 st.logo(str(ASSETS / "logo.svg"), size="large", icon_image=str(ASSETS / "icon.svg"))
 
 with st.sidebar:
-    h = warehouse.health()
+    h = ui.health()
     st.html('<div class="ap-side-label">Status</div>')
     ui.status_list(
         ("Data connected" if h.ok else "Data offline", "good" if h.ok else "bad"),

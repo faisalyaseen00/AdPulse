@@ -30,7 +30,7 @@ class Kpi:
     value: float
     prior: float
     fmt: str  # money | int | ratio | pct
-    better: str = "up"  # up | down
+    better: str = "up"  # up | down | neutral
 
     @property
     def change(self) -> float | None:
@@ -44,7 +44,9 @@ class Kpi:
     @property
     def good(self) -> bool | None:
         c = self.change
-        return None if c is None or abs(c) < 0.005 else (c > 0) == (self.better == "up")
+        if c is None or abs(c) < 0.005 or self.better == "neutral":
+            return None  # e.g. more ad spend is neither good nor bad on its own
+        return (c > 0) == (self.better == "up")
 
 
 @dataclass
@@ -93,7 +95,7 @@ def _kpis(start: date, end: date) -> list[Kpi]:
         return r["spend"] / r["new_paid_customers"] if r["new_paid_customers"] else 0.0
 
     return [
-        Kpi(SPEND, round(float(cur["spend"]), 2), round(float(prv["spend"]), 2), "money", "down"),
+        Kpi(SPEND, round(float(cur["spend"]), 2), round(float(prv["spend"]), 2), "money", "neutral"),
         Kpi(SALES, round(float(cur["paid_revenue"]), 2), round(float(prv["paid_revenue"]), 2), "money"),
         Kpi(BACK, round(roas(cur), 2), round(roas(prv), 2), "perdollar"),
         Kpi(NEW, float(cur["new_paid_customers"]), float(prv["new_paid_customers"]), "int"),

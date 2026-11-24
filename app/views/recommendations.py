@@ -17,13 +17,14 @@ window = top[0].selectbox("Based on", [14, 30, 60], index=1, format_func=lambda 
 if top[1].button("Check my ads for new ideas", type="primary", width="stretch"):
     found = recs.rule_recommendations(window)
     n = recs.save(found)
+    ui.suggestions_changed()
     st.toast(f"{n} new suggestion(s) added" if n else "No new suggestions: your list is up to date", icon="✅")
 
 who = ui.reviewer()
 if not who:
     top[2].info("Type **your name** in the sidebar to approve or reject.", icon=":material/badge:")
 
-df = recs.latest()
+df = ui.suggestions()
 if df.empty:
     st.info("No suggestions yet. Click **Check my ads for new ideas**, block searches on **Wasted searches**, "
             "or add ideas from **Ask a question**.")
@@ -81,45 +82,69 @@ def how_to(r: pd.Series) -> str:
     return "\n".join(f"{i}. {ui.md(t)}" for i, t in enumerate(steps, 1))
 
 
-def card(r: pd.Series, actions: str) -> None:
-    with st.container(border=True):
-        k_label, k_kind = KIND.get(r.kind, (r.kind, "muted"))
-        head = (f"{ui.badge(k_label, k_kind)} {ui.badge(r.platform.title(), 'muted')} "
-                f"{ui.badge(STATUS_WORDS.get(r.status, r.status), STATUS[r.status])}")
-        st.html(f"<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px'>{head}</div>"
-                f"<div class='ap-card-title'>{html.escape(r.entity_name)}</div>"
-                f"<div class='ap-muted'>Campaign: {html.escape(r.campaign_name)}, "
-                f"{SOURCE_WORDS.get(r.source, r.source)}</div>"
-                f"<div class='ap-why'>{html.escape(r.reason)}</div>"
-                f"<div class='ap-facts'>{evidence(r.metrics)}</div>")
-        c = st.columns([3, 1.2, 1.2])
-        impact = "saved per month" if r.kind != "scale_ad" else "extra customer value per month"
-        c[0].caption(f"About **{ui.money(r.est_impact)}** {impact}. Suggested {pd.Timestamp(r.created_at):%b %-d}."
-                     + (f" Decided by **{r.decided_by}**." if r.decided_by else "")
-                     + (f" Note: _{r.note}_" if r.note else ""))
-        if actions == "decide":
-            note = st.text_input("Note (optional)", key=f"note_{r.id}", label_visibility="collapsed",
-                                 placeholder="Add a note (optional)")
-            if c[1].button("Approve", key=f"ap_{r.id}", type="primary", disabled=not who, width="stretch"):
-                recs.decide(r.id, "approved", who, note)
-                st.rerun()
-            if c[2].button("Reject", key=f"rj_{r.id}", disabled=not who, width="stretch"):
-                recs.decide(r.id, "rejected", who, note)
-                st.rerun()
-        elif actions == "apply":
-            if c[1].button("Mark as done", key=f"apl_{r.id}", type="primary", disabled=not who, width="stretch",
-                           help="Click after you've made this change in Meta or Google."):
-                recs.decide(r.id, "applied", who, r.note)
-                st.rerun()
-            if c[2].button("Undo approval", key=f"wd_{r.id}", disabled=not who, width="stretch"):
-                recs.decide(r.id, "rejected", who, "withdrawn after approval")
-                st.rerun()
-        if actions in ("apply", "decide"):
-            with st.expander("How to make this change in Meta or Google"):
-                st.markdown(how_to(r))
-                st.caption("For developers, the same change as an API request:")
-                st.code(json.dumps(recs.change_payload(r.to_dict()), indent=2), language="json")
+DONE_WORDS = {"approved": "Approved", "rejected": "Rejected", "applied": "Marked as done"}
 
+
+def decide(r: pd.Series, status: str, note: str) -> None:
+    try:
+        recs.decide(r.id, status, who, note)
+    except (KeyError, ValueError):
+        # someone else (another browser, the Monday refresh) changed it since this page loaded
+        ui.suggestions_changed()
+        st.session_state["flash"] = ("That suggestion was already changed elsewhere. The list is now up to date.",
+                                     "stale")
+        st.rerun()
+    ui.suggestions_changed()
+    nxt = (" Next: make the change in Meta or Google, then mark it done on the Approved tab."
+           if status == "approved" else "")
+    st.session_state["flash"] = (f"{DONE_WORDS[status]}: {r.entity_name}.{nxt}", status)
+    st.rerun()
+
+
+def card(r: pd.Series, actions: str) -> None:
+    k_label, k_kind = KIND.get(r.kind, (r.kind, "muted"))
+    impact = "saved per month" if r.kind != "scale_ad" else "extra customer value per month"
+    need_name = None if who else "Type your name in the sidebar first."
+    with st.container(border=True):
+        left, right = st.columns([4, 1.25], gap="medium")
+        with left:
+            st.html(f"<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px'>{ui.badge(k_label, k_kind)} "
+                    f"{ui.badge(r.platform.title(), 'muted')}</div>"
+                    f"<div class='ap-card-title'>{html.escape(r.entity_name)}</div>"
+                    f"<div class='ap-muted'>Campaign {html.escape(r.campaign_name)}, "
+                    f"{SOURCE_WORDS.get(r.source, r.source)}, {pd.Timestamp(r.created_at):%b %-d}</div>"
+                    f"<div class='ap-why'>{html.escape(r.reason)}</div>"
+                    f"<div class='ap-facts'>{evidence(r.metrics)}</div>"
+                    + (f"<div class='ap-muted' style='margin-top:6px'>Approved by <b>{html.escape(r.decided_by)}</b>"
+                       + (f": {html.escape(r.note)}" if r.note else "") + "</div>" if r.decided_by else ""))
+        with right:
+            st.html(f"<div class='ap-impact'><div class='n'>{ui.money(r.est_impact)}</div>"
+                    f"<div class='c'>{impact}</div></div>")
+            if actions == "decide":
+                if st.button("Approve", key=f"ap_{r.id}", type="primary", disabled=not who, width="stretch",
+                             icon=":material/check:", help=need_name):
+                    decide(r, "approved", st.session_state.get(f"note_{r.id}", ""))
+                if st.button("Reject", key=f"rj_{r.id}", disabled=not who, width="stretch", help=need_name):
+                    decide(r, "rejected", st.session_state.get(f"note_{r.id}", ""))
+                with st.popover("Add a note", width="stretch", icon=":material/edit_note:"):
+                    st.text_input("Note", key=f"note_{r.id}", placeholder="Why you approved or rejected",
+                                  label_visibility="collapsed")
+            elif actions == "apply":
+                if st.button("Mark as done", key=f"apl_{r.id}", type="primary", disabled=not who, width="stretch",
+                             icon=":material/done_all:",
+                             help=need_name or "Click after you've made this change in Meta or Google."):
+                    decide(r, "applied", r.note)
+                if st.button("Undo approval", key=f"wd_{r.id}", disabled=not who, width="stretch", help=need_name):
+                    decide(r, "rejected", "withdrawn after approval")
+        with st.expander("How to make this change in Meta or Google"):
+            st.markdown(how_to(r))
+            st.caption("For developers, the same change as an API request:")
+            st.code(json.dumps(recs.change_payload(r.to_dict()), indent=2), language="json")
+
+
+if flash := st.session_state.pop("flash", None):
+    msg, status = flash
+    st.toast(msg, icon={"rejected": "↩️", "stale": "🔄"}.get(status, "✅"))
 
 tab_p, tab_a, tab_h = st.tabs([f"Waiting for you ({len(pending)})", f"Approved ({len(approved)})", "Past decisions"])
 with tab_p:
@@ -127,7 +152,7 @@ with tab_p:
                      format_func=lambda k: KIND[k][0], label_visibility="collapsed")
     view = pending[pending.kind.isin(kinds or list(KIND))].sort_values("est_impact", ascending=False)
     if view.empty:
-        st.success("You're all caught up.")
+        st.success("You're all caught up. New ideas appear here after the next ad check.")
     for _, r in view.iterrows():
         card(r, "decide")
 with tab_a:
