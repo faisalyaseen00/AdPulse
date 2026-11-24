@@ -14,7 +14,7 @@ if not ui.require_warehouse():
     st.stop()
 
 top_l, top_r = st.columns([3, 2], vertical_alignment="center")
-window = top_r.segmented_control("Period", [7, 30, 90], default=30, format_func=lambda d: f"Last {d} days",
+window = top_r.segmented_control("Period", [7, 30, 90], default=30, format_func=lambda d: f"{d} days",
                                  label_visibility="collapsed") or 30
 
 k = ui.q(

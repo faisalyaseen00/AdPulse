@@ -34,6 +34,8 @@ code, pre, .stCode * { font-family: ui-monospace, SFMono-Regular, Menlo, monospa
 h1, h2, h3, h4 { font-family: var(--display); color: var(--ink); letter-spacing: -0.01em; }
 .stMarkdown p, .stMarkdown li { font-size: 1rem; line-height: 1.6; color: var(--ink-2); }
 #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; height: 0; }
+/* hosting toolbar (Fork / GitHub / deploy buttons) is noise for business readers */
+[data-testid="stToolbar"], [data-testid="stToolbarActions"], .stAppDeployButton { display: none !important; }
 header[data-testid="stHeader"] { background: transparent; }
 :focus-visible { outline: 2px solid var(--pulse) !important; outline-offset: 2px; }
 

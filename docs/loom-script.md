@@ -1,29 +1,38 @@
 # Loom demo (3 minutes)
 
-**0:00 – Data flowing in (30s)** · *Data pipeline* page
-- Show the flow strip: Sources → Airbyte → raw → models → agent.
-- Click **Sync now** (mode `airbyte`): the log streams each connector → table with row counts.
-- *Sync runs* tab: every stream load is recorded.
+Before recording: open the app, type your name in the sidebar (**Your name**), and open Slack in another tab.
 
-**0:30 – Overview (20s)**
-- KPIs vs. the prior period, and the funnel: impressions → clicks → sessions → customers → revenue → LTV.
-- Ad scorecard: LTV:CAC per ad.
+**0:00 – The verdict (25s)** · *Overview*
+- Read the headline out loud: "Your ads brought back $1.03 for every $1 you spent…"
+- Point at the sentence under it: spend, new customers, what each customer is worth.
+- Hover the **?** next to "Cost per new customer" to show every number is explained in plain words.
 
-**0:50 – Ask an LTV question (60s)** · *Ask AdPulse*
-- Click "Which ads brought customers with the highest LTV last month?"
-- Point out the badges: **Verified · Critic passed · N/N numbers traced to data**.
-- Open **SQL**: the agent wrote it, ClickHouse ran it as a read-only user.
-- Open **How I got this**: write SQL → guard → run → critic → answer → number check.
-- Open **Number check**: each figure ✅ with where it came from (cell / computed: 125.75 / 34.81).
-- Click **Queue for approval** on a suggested action.
+**0:25 – What to do this week (25s)** · *Overview*
+- Three actions with the money attached: give "RSA - Brand" more budget, pause "PMax - Asset Group A",
+  block wasted searches.
+- Scroll to **How each ad is doing**: 🟢 Worth more budget, 🔴 Losing money, ⚪ Doing OK.
 
-**1:50 – Search term audit (35s)** · *Search term audit*
-- ~40% of generic search spend went to jobs / free / DIY queries.
-- Tick the terms, **Queue negative keywords**.
+**0:50 – Ask a question (55s)** · *Ask a question*
+- Click "Which ads brought in the most valuable customers last month?"
+- Show the green badge: **Checked: every number below matches your data**.
+- Read the headline and the bold-led bullets; point out there's no jargon.
+- Open **Behind the scenes**: the database query (read-only), the reviewer step, and the number check
+  with a ✅ for every figure.
+- Click **Add to suggestions** on a suggested next step.
 
-**2:25 – Approvals (15s)**
-- Pending cards with evidence. Approve one and show the exact Google Ads / Meta API change.
-- "Nothing changes spend without a human yes."
+**1:45 – Wasted searches (30s)** · *Wasted searches*
+- "Not buyers": people searching for jobs, free samples, store hours. About 38% of search budget.
+- Leave the boxes ticked and click **Add N search(es) to suggestions**.
 
-**2:40 – Weekly report in Slack (20s)** · *Weekly report*
-- KPI tiles, summary, **Send now** → switch to Slack and show the Block Kit message.
+**2:15 – Suggestions (20s)** · *Suggestions*
+- A card explains why in plain words. Click **Approve**.
+- Open **How to make this change in Meta or Google**: step-by-step instructions.
+- Say: "Nothing changes in the ad accounts until a person approves it."
+
+**2:35 – Weekly report to Slack (25s)** · *Weekly report*
+- Show the week's numbers and summary. Click **Send to Slack**.
+- Switch to Slack: the report arrives. Mention it also goes out by itself every Monday at 08:00.
+
+**Behind the scenes, for a technical audience (optional, +30s)** · *Data status*
+- Four sources (Meta, Google Ads, Google Analytics, Shopify) loaded by Airbyte connectors into ClickHouse.
+- Open **Technical details** for the tables and load history.
