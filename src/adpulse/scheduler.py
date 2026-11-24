@@ -53,8 +53,8 @@ class Schedule:
         return self.next_run(now) - timedelta(days=7)
 
     def describe(self) -> str:
-        day = next(k for k, v in DAYS.items() if v == self.weekday).title()
-        return f"every {day} at {self.at:%H:%M} {self.tz.key}"
+        day = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][self.weekday]
+        return f"every {day} at {self.at:%H:%M} ({self.tz.key} time)"
 
 
 def run_weekly(send: bool = True) -> dict[str, str]:

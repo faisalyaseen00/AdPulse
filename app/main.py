@@ -44,18 +44,18 @@ settings = get_settings()
 
 
 pages = {
-    "Analyze": [
-        st.Page("views/overview.py", title="Overview", icon=":material/dashboard:", default=True),
-        st.Page("views/ask.py", title="Ask AdPulse", icon=":material/forum:", url_path="ask"),
+    "Insights": [
+        st.Page("views/overview.py", title="Overview", icon=":material/space_dashboard:", default=True),
+        st.Page("views/ask.py", title="Ask a question", icon=":material/chat:", url_path="ask"),
     ],
-    "Act": [
-        st.Page("views/audit.py", title="Search term audit", icon=":material/search_insights:", url_path="audit"),
-        st.Page("views/recommendations.py", title="Approvals", icon=":material/fact_check:",
+    "Actions": [
+        st.Page("views/recommendations.py", title="Suggestions", icon=":material/task_alt:",
                 url_path="recommendations"),
-        st.Page("views/reports.py", title="Weekly report", icon=":material/summarize:", url_path="reports"),
+        st.Page("views/audit.py", title="Wasted searches", icon=":material/money_off:", url_path="audit"),
+        st.Page("views/reports.py", title="Weekly report", icon=":material/mail:", url_path="reports"),
     ],
     "Data": [
-        st.Page("views/pipeline.py", title="Data pipeline", icon=":material/database:", url_path="pipeline"),
+        st.Page("views/pipeline.py", title="Data status", icon=":material/sync:", url_path="pipeline"),
     ],
 }
 nav = st.navigation(pages)
@@ -65,17 +65,32 @@ st.logo(str(ASSETS / "logo.svg"), size="large", icon_image=str(ASSETS / "icon.sv
 
 with st.sidebar:
     h = warehouse.health()
-    st.html('<div class="ap-side-label">System</div>')
+    st.html('<div class="ap-side-label">Status</div>')
     ui.status_list(
-        ("ClickHouse " + (".".join(h.version.split(".")[:2]) if h.ok else "offline"), "good" if h.ok else "bad"),
-        (settings.llm_label if settings.llm_configured else "LLM not configured",
-         "info" if settings.llm_configured else "warn"),
-        ("Slack connected" if settings.slack_configured else "Slack off",
+        ("Data connected" if h.ok else "Data offline", "good" if h.ok else "bad"),
+        ("AI assistant ready" if settings.llm_configured else "AI assistant off",
+         "good" if settings.llm_configured else "warn"),
+        ("Slack reports on" if settings.slack_configured else "Slack reports off",
          "good" if settings.slack_configured else "muted"),
     )
-    st.html('<div class="ap-side-label">Reviewer</div>')
-    st.text_input("Reviewer name", key="reviewer", placeholder="Your name (needed to approve)",
-                  label_visibility="collapsed", help="Recorded on every approve / reject decision.")
-    st.caption("🔒 Suggestions never change ad spend on their own. Every action needs human approval.")
+    if settings.slack_configured and h.ok and st.button("Send weekly report to Slack", icon=":material/send:",
+                                                          width="stretch", key="side_slack"):
+        from adpulse.llm import LLMError, get_llm
+        from adpulse.reports import weekly
+        with st.spinner("Preparing and sending…"):
+            try:
+                llm = get_llm() if settings.llm_configured else None
+            except LLMError:
+                llm = None
+            res = weekly.deliver(weekly.build(llm=llm), slack=True, email=False)
+        r = res.get("slack", "")
+        if r.startswith("sent"):
+            st.toast("Weekly report sent to Slack", icon="✅")
+        else:
+            st.error(f"Couldn't send to Slack. {r.removeprefix('error: ')}")
+    st.html('<div class="ap-side-label">Your name</div>')
+    st.text_input("Your name", key="reviewer", placeholder="Needed to approve suggestions",
+                  label_visibility="collapsed", help="Saved with every approve or reject, so the team knows who decided.")
+    st.caption("Nothing changes in your ad accounts until a person approves it.")
 
 nav.run()

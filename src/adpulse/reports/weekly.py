@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from .. import warehouse
+from .. import plain, warehouse
 from ..actions import recommendations as recs
 from ..agent.schemas import Computation
 from ..agent.verify import verify_numbers
@@ -38,7 +38,8 @@ class Kpi:
 
     def text(self, v: float | None = None) -> str:
         v = self.value if v is None else v
-        return {"money": f"${v:,.2f}", "int": f"{v:,.0f}", "ratio": f"{v:.2f}x", "pct": f"{v:.1%}"}[self.fmt]
+        return {"money": f"${v:,.2f}", "int": f"{v:,.0f}", "ratio": f"{v:.2f}x", "pct": f"{v:.1%}",
+                "perdollar": f"${v:.2f}"}[self.fmt]
 
     @property
     def good(self) -> bool | None:
@@ -68,6 +69,10 @@ class Commentary(BaseModel):
         default_factory=list, description="Each derived number (ratio, % change) with its arithmetic over data values.")
 
 
+SPEND, SALES, BACK = plain.label("spend"), plain.label("paid_revenue"), plain.label("roas")
+NEW, COST, ALL_SALES = plain.label("new_customers"), plain.label("cac"), plain.label("total_revenue")
+
+
 def _kpis(start: date, end: date) -> list[Kpi]:
     q = """
         SELECT
@@ -88,12 +93,12 @@ def _kpis(start: date, end: date) -> list[Kpi]:
         return r["spend"] / r["new_paid_customers"] if r["new_paid_customers"] else 0.0
 
     return [
-        Kpi("Ad spend", round(float(cur["spend"]), 2), round(float(prv["spend"]), 2), "money", "down"),
-        Kpi("Paid revenue", round(float(cur["paid_revenue"]), 2), round(float(prv["paid_revenue"]), 2), "money"),
-        Kpi("ROAS", round(roas(cur), 2), round(roas(prv), 2), "ratio"),
-        Kpi("New paid customers", float(cur["new_paid_customers"]), float(prv["new_paid_customers"]), "int"),
-        Kpi("Blended CAC", round(cac(cur), 2), round(cac(prv), 2), "money", "down"),
-        Kpi("Total revenue", round(float(cur["total_revenue"]), 2), round(float(prv["total_revenue"]), 2), "money"),
+        Kpi(SPEND, round(float(cur["spend"]), 2), round(float(prv["spend"]), 2), "money", "down"),
+        Kpi(SALES, round(float(cur["paid_revenue"]), 2), round(float(prv["paid_revenue"]), 2), "money"),
+        Kpi(BACK, round(roas(cur), 2), round(roas(prv), 2), "perdollar"),
+        Kpi(NEW, float(cur["new_paid_customers"]), float(prv["new_paid_customers"]), "int"),
+        Kpi(COST, round(cac(cur), 2), round(cac(prv), 2), "money", "down"),
+        Kpi(ALL_SALES, round(float(cur["total_revenue"]), 2), round(float(prv["total_revenue"]), 2), "money"),
     ]
 
 
@@ -157,20 +162,22 @@ def build(end: date | None = None, days: int = 7, llm: LLM | None = None) -> Wee
 def _template_commentary(r: WeeklyReport) -> list[str]:
     k = {x.label: x for x in r.kpis}
     out = []
-    roas = k["ROAS"]
-    if roas.change is not None:
-        out.append(f"ROAS was {roas.text()} vs {roas.text(roas.prior)} the week before; "
-                   f"spend {k['Ad spend'].text()} brought {k['New paid customers'].text()} new paid customers "
-                   f"at {k['Blended CAC'].text()} CAC.")
+    back = k[BACK]
+    if back.change is not None:
+        out.append(f"Your ads brought back {back.text()} for every $1 spent (the week before: "
+                   f"{back.text(back.prior)}). You spent {k[SPEND].text()} and won {k[NEW].text()} new customers "
+                   f"at {k[COST].text()} each.")
     if not r.top_ads.empty:
         t = r.top_ads.iloc[0]
-        out.append(f"Best customer economics: {t['ad_name']} (LTV:CAC {t['ltv_to_cac']:.2f}, CAC ${t['cac']:,.2f}).")
+        out.append(f"Best ad: {t['ad_name']}. Each new customer costs ${t['cac']:,.2f} and is worth "
+                   f"{t['ltv_to_cac']:.1f}× that.")
     if not r.worst_ads.empty:
         w = r.worst_ads.iloc[0]
-        out.append(f"Weakest: {w['ad_name']} (LTV:CAC {w['ltv_to_cac']:.2f}, CAC ${w['cac']:,.2f}). Review for pause.")
+        out.append(f"Weakest ad: {w['ad_name']}. Each new customer costs ${w['cac']:,.2f} but is only worth "
+                   f"{w['ltv_to_cac']:.1f}× that. Worth pausing.")
     if r.waste["flagged"]:
-        out.append(f"{r.waste['flagged']} search terms with no buyer intent cost ${r.waste['wasted_spend']:,.2f} "
-                   f"this week. Negative keywords are waiting for approval.")
+        out.append(f"{r.waste['flagged']} Google searches from people who weren't going to buy cost "
+                   f"${r.waste['wasted_spend']:,.2f}. Blocking them is waiting for your approval.")
     return out
 
 
@@ -184,10 +191,13 @@ def _llm_commentary(r: WeeklyReport, llm: LLM) -> list[str]:
     # skip empty frames and all-NA columns so pandas doesn't warn about dtype inference
     facts = pd.concat([p.dropna(axis=1, how="all") for p in parts if not p.empty], ignore_index=True)
     out = llm.structured(
-        system=("You write the commentary for a weekly paid-media report read by a busy head of growth. "
-                "3-4 crisp bullets: what changed, which ads to pause or scale, wasted search spend. "
+        system=("You write the summary for a weekly ad report read by a busy business owner.\n"
+                + plain.WRITING_RULES + "\n"
+                "Write 3-4 short bullets: how the money did this week, which ad deserves more budget, which ad to "
+                "consider pausing, and money wasted on Google searches from non-buyers. One sentence each. "
                 "Quote only numbers present in the data; declare any derived number (e.g. a % change) in "
-                "`computations` with its arithmetic. Actions are proposals needing human approval."),
+                "`computations` with its arithmetic. Changes are suggestions a person approves; never say "
+                "anything was changed."),
         user=f"Week {r.period_start} to {r.period_end}. Data:\n{facts.to_csv(index=False)}",
         schema=Commentary, step="weekly_commentary")
     checks = verify_numbers("\n".join(out.bullets), facts,
@@ -205,24 +215,35 @@ def _arrow(k: Kpi) -> str:
     return f"{icon} {abs(k.change):.0%}"
 
 
+def _ad_line(a, md: bool = True) -> str:
+    name = f"**{a.ad_name}**" if md else f"*{a.ad_name}*"
+    link = "and is worth" if a.ltv_to_cac >= 1 else "but is only worth"
+    return (f"{name} ({str(a.platform).title()}): each new customer costs ${a.cac:,.2f} {link} "
+            f"${a.avg_ltv:,.2f}, {a.ltv_to_cac:.1f}× the cost")
+
+
+def _waste_title(r: WeeklyReport) -> str:
+    return (f"Wasted Google searches: ${r.waste['wasted_spend']:,.2f} on {r.waste['flagged']} searches "
+            f"({r.waste['wasted_share']:.0%} of search spend)")
+
+
+def _pending_line(r: WeeklyReport) -> str:
+    return f"{len(r.pending)} suggestion(s) waiting for your approval. Nothing changes until someone approves."
+
+
 def to_markdown(r: WeeklyReport) -> str:
     lines = [f"# AdPulse weekly report: {r.period_start:%b %d} – {r.period_end:%b %d, %Y}", "",
-             "| Metric | This week | Prior week | Change |", "|---|---:|---:|---:|"]
+             "| | This week | Week before | Change |", "|---|---:|---:|---:|"]
     lines += [f"| {k.label} | {k.text()} | {k.text(k.prior)} | {_arrow(k)} |" for k in r.kpis]
     lines += ["", "## Summary", *[f"- {c}" for c in r.commentary], ""]
     if not r.top_ads.empty:
-        lines += ["## Scale candidates (best LTV:CAC)"]
-        lines += [f"- **{a.ad_name}** ({a.platform}): CAC ${a.cac:,.2f}, avg LTV ${a.avg_ltv:,.2f}, "
-                  f"LTV:CAC {a.ltv_to_cac:.2f}" for a in r.top_ads.itertuples()]
+        lines += ["## Ads worth more budget", *[f"- {_ad_line(a)}" for a in r.top_ads.itertuples()]]
     if not r.worst_ads.empty:
-        lines += ["", "## Pause candidates (worst LTV:CAC)"]
-        lines += [f"- **{a.ad_name}** ({a.platform}): CAC ${a.cac:,.2f}, avg LTV ${a.avg_ltv:,.2f}, "
-                  f"LTV:CAC {a.ltv_to_cac:.2f}" for a in r.worst_ads.itertuples()]
-    lines += ["", (f"## Search term waste: ${r.waste['wasted_spend']:,.2f} on {r.waste['flagged']} terms "
-                   f"({r.waste['wasted_share']:.0%} of search spend)")]
-    lines += [f"- `{t.search_term}` (${t.cost:,.2f}, {t.intent}) → negative {t.suggested_negative}"
+        lines += ["", "## Ads losing money", *[f"- {_ad_line(a)}" for a in r.worst_ads.itertuples()]]
+    lines += ["", f"## {_waste_title(r)}"]
+    lines += [f"- `{t.search_term}` cost ${t.cost:,.2f} ({plain.intent(t.intent).lower()}): block {t.suggested_negative}"
               for t in r.top_waste_terms.itertuples()]
-    lines += ["", f"**{len(r.pending)} recommendation(s) awaiting approval.** Nothing changes until a human approves."]
+    lines += ["", f"**{_pending_line(r)}**"]
     return "\n".join(lines)
 
 
@@ -230,24 +251,22 @@ def to_slack_blocks(r: WeeklyReport, app_url: str = "") -> list[dict]:
     kpi_fields = [{"type": "mrkdwn", "text": f"*{k.label}*\n{k.text()}  {_arrow(k)}"} for k in r.kpis]
     blocks: list[dict] = [
         {"type": "header", "text": {"type": "plain_text",
-                                    "text": f"📊 AdPulse weekly · {r.period_start:%b %d} – {r.period_end:%b %d}"}},
+                                    "text": f"📊 AdPulse weekly report: {r.period_start:%b %d} – {r.period_end:%b %d}"}},
         {"type": "section", "fields": kpi_fields[:6]},
         {"type": "divider"},
         {"type": "section", "text": {"type": "mrkdwn", "text": "*Summary*\n" + "\n".join(f"• {c}" for c in r.commentary)}},
     ]
     if not r.top_ads.empty:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*🚀 Scale candidates*\n" + "\n".join(
-            f"• *{a.ad_name}*: LTV:CAC {a.ltv_to_cac:.2f}, CAC ${a.cac:,.2f}" for a in r.top_ads.itertuples())}})
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*🟢 Ads worth more budget*\n" + "\n".join(
+            f"• {_ad_line(a, md=False)}" for a in r.top_ads.itertuples())}})
     if not r.worst_ads.empty:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*⏸ Pause candidates*\n" + "\n".join(
-            f"• *{a.ad_name}*: LTV:CAC {a.ltv_to_cac:.2f}, CAC ${a.cac:,.2f}" for a in r.worst_ads.itertuples())}})
-    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text":
-                   f"*🔎 Search term waste:* ${r.waste['wasted_spend']:,.2f} on {r.waste['flagged']} terms with no buyer intent"}})
-    ctx = f"{len(r.pending)} recommendation(s) awaiting human approval · no changes are made automatically"
-    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": ctx}]})
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*🔴 Ads losing money*\n" + "\n".join(
+            f"• {_ad_line(a, md=False)}" for a in r.worst_ads.itertuples())}})
+    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*🔎 {_waste_title(r)}*"}})
+    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": _pending_line(r)}]})
     if app_url:
         blocks.append({"type": "actions", "elements": [{"type": "button", "style": "primary",
-                       "text": {"type": "plain_text", "text": "Review in AdPulse"},
+                       "text": {"type": "plain_text", "text": "Review suggestions"},
                        "url": f"{app_url.rstrip('/')}/recommendations"}]})
     return blocks
 
@@ -274,8 +293,9 @@ def to_html(r: WeeklyReport, app_url: str = "") -> str:
         return "".join(
             f"<tr><td style='padding:8px 12px;border-left:3px solid {accent};background:#fafbfc'>"
             f"<b style='color:#0f1419'>{e(str(a.ad_name))}</b> <span style='color:#667085'>· {e(str(a.platform).title())}</span><br>"
-            f"<span style='color:#475467;font-size:13px'>CAC ${a.cac:,.2f} · avg LTV ${a.avg_ltv:,.2f} · "
-            f"LTV:CAC <b>{a.ltv_to_cac:.2f}</b></span></td></tr><tr><td style='height:6px'></td></tr>"
+            f"<span style='color:#475467;font-size:13px'>Each new customer costs ${a.cac:,.2f} "
+            f"{'and is worth' if a.ltv_to_cac >= 1 else 'but is only worth'} "
+            f"${a.avg_ltv:,.2f}, <b>{a.ltv_to_cac:.1f}×</b> the cost</span></td></tr><tr><td style='height:6px'></td></tr>"
             for a in df.itertuples())
 
     def block(title: str, body: str) -> str:
@@ -285,44 +305,44 @@ def to_html(r: WeeklyReport, app_url: str = "") -> str:
     parts = [block("Summary", "<ul style='margin:0;padding-left:18px;color:#344054;line-height:1.6'>"
                    + "".join(f"<li>{e(c)}</li>" for c in r.commentary) + "</ul>")]
     if not r.top_ads.empty:
-        parts.append(block("Scale candidates (best LTV:CAC)",
+        parts.append(block("Ads worth more budget",
                            f"<table width='100%' cellpadding='0' cellspacing='0'>{ad_list(r.top_ads, '#12b76a')}</table>"))
     if not r.worst_ads.empty:
-        parts.append(block("Pause candidates (worst LTV:CAC)",
+        parts.append(block("Ads losing money",
                            f"<table width='100%' cellpadding='0' cellspacing='0'>{ad_list(r.worst_ads, '#f04438')}</table>"))
     terms = "".join(
         f"<tr><td style='padding:7px 0;border-top:1px solid #eef0f3;color:#344054'>{e(str(t.search_term))}"
-        f" <span style='color:#667085;font-size:12px'>({e(str(t.intent))})</span></td>"
+        f" <span style='color:#667085;font-size:12px'>({e(plain.intent(str(t.intent)).lower())})</span></td>"
         f"<td align='right' style='padding:7px 0;border-top:1px solid #eef0f3;color:#b42318;font-weight:600'>${t.cost:,.2f}</td>"
         f"<td align='right' style='padding:7px 0 7px 10px;border-top:1px solid #eef0f3;color:#475467;font-size:12px'>"
-        f"negative {e(str(t.suggested_negative))}</td></tr>" for t in r.top_waste_terms.itertuples())
+        f"block {e(str(t.suggested_negative))}</td></tr>" for t in r.top_waste_terms.itertuples())
     parts.append(block(
-        f"Search term waste: ${r.waste['wasted_spend']:,.2f} on {r.waste['flagged']} terms "
-        f"({r.waste['wasted_share']:.0%} of search spend)",
+        _waste_title(r),
         f"<table width='100%' cellpadding='0' cellspacing='0' style='font-size:14px'>{terms}</table>"))
     cta = (f"<a href='{e(app_url.rstrip('/'))}/recommendations' style='display:inline-block;background:#2a78d6;"
            f"color:#ffffff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:10px'>"
-           f"Review {len(r.pending)} pending approval(s)</a>") if app_url else ""
-    source = "AI-written, every number checked against the data" if r.commentary_source == "llm" else "template"
+           f"Review {len(r.pending)} suggestion(s)</a>") if app_url else ""
+    source = ("Summary written by AI, every number checked against your data" if r.commentary_source == "llm"
+              else "Summary built from your data")
 
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f4f5f7">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;{font}"><tr><td align="center" style="padding:24px 12px">
 <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #e6e8ec;border-radius:16px;overflow:hidden;{font};font-size:14px">
 <tr><td style="background:linear-gradient(120deg,#2a78d6,#5b5bd6);background-color:#2a78d6;padding:22px 28px;color:#ffffff">
-  <div style="font-size:13px;opacity:.85;letter-spacing:.04em;text-transform:uppercase">AdPulse · weekly report</div>
+  <div style="font-size:13px;opacity:.85;">AdPulse weekly report</div>
   <div style="font-size:22px;font-weight:700;margin-top:4px">{r.period_start:%b %d} – {r.period_end:%b %d, %Y}</div></td></tr>
 <tr><td style="padding:20px 28px 0"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:12px;font-size:14px">
-  <tr style="background:#f8f9fb"><th align="left" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Metric</th>
-  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">This week</th>
-  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Prior</th>
-  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px;text-transform:uppercase">Change</th></tr>{kpi_rows}</table></td></tr>
+  <tr style="background:#f8f9fb"><th align="left" style="padding:9px 12px;color:#667085;font-size:12px;">&nbsp;</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px">This week</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px">Week before</th>
+  <th align="right" style="padding:9px 12px;color:#667085;font-size:12px">Change</th></tr>{kpi_rows}</table></td></tr>
 {"".join(parts)}
 <tr><td style="padding:24px 28px">
   <div style="background:#fffaeb;border:1px solid #fedf89;border-radius:12px;padding:12px 14px;color:#7a2e0e">
-  <b>{len(r.pending)} recommendation(s) awaiting approval.</b> Nothing changes in your ad accounts until a human approves.</div>
+  <b>{len(r.pending)} suggestion(s) waiting for your approval.</b> Nothing changes in your ad accounts until someone approves.</div>
   <div style="margin-top:16px">{cta}</div></td></tr>
 <tr><td style="padding:14px 28px;border-top:1px solid #eef0f3;color:#98a2b3;font-size:12px">
-  Commentary: {source}. Sent by AdPulse.</td></tr>
+  {source}. Sent by AdPulse.</td></tr>
 </table></td></tr></table></body></html>"""
 
 

@@ -120,3 +120,13 @@ def test_numbers_in_answer_match_warehouse(db):
         {"n": top.ad_name}).iloc[0]["v"]
     assert abs(check - top.avg_customer_ltv) < 0.01
     assert re.search(re.escape(f"${top.avg_customer_ltv:,.2f}"), ans.answer_markdown)
+
+
+def test_answer_is_rewritten_in_plain_words(db):
+    # the scripted narrator writes "LTV" and "CAC"; the reader must never see them
+    ans = AdPulseAgent(make_llm([GOOD_SQL])).ask("Which ads brought the most valuable customers last month?")
+    assert ans.ok and ans.verified
+    from adpulse import plain
+    shown = " ".join([ans.headline, ans.answer_markdown, *ans.caveats, *(a.rationale for a in ans.suggested_actions)])
+    assert plain.find_jargon(shown) == []
+    assert any(s.name == "plain language" for s in ans.steps)

@@ -2,24 +2,26 @@ import plotly.graph_objects as go
 import streamlit as st
 import ui
 
+from adpulse import plain
 from adpulse.actions import recommendations as recs
 from adpulse.audit import search_terms
 from adpulse.config import get_settings
 from adpulse.llm import LLMError, get_llm
 
-ui.hero("Search term audit", "What people actually typed before you paid for the click, and which terms have no buyer intent.", icon="🔎")
+ui.hero("Wasted searches", "The exact words people typed into Google before clicking your ad. Some of them were "
+        "never going to buy. Block those and stop paying for their clicks.")
 if not ui.require_warehouse():
     st.stop()
 
-c1, c2, c3 = st.columns([2, 2, 3])
-days = c1.selectbox("Window", [7, 14, 30, 90], index=2, format_func=lambda d: f"Last {d} days")
-min_cost = c2.number_input("Min. cost to flag ($)", 0.0, 500.0, 5.0, 5.0)
-use_llm = c3.toggle("Classify unmatched terms with AI", value=get_settings().llm_configured,
+c1, c2, c3 = st.columns([2, 2, 3], vertical_alignment="bottom")
+days = c1.selectbox("Period", [7, 14, 30, 90], index=2, format_func=lambda d: f"Last {d} days")
+min_cost = c2.number_input("Only show searches that cost at least ($)", 0.0, 500.0, 5.0, 5.0)
+use_llm = c3.toggle("Let AI sort the unusual searches", value=get_settings().llm_configured,
                     disabled=not get_settings().llm_configured,
-                    help="Rules handle known patterns (jobs, free, DIY, support...). The LLM classifies the rest.")
+                    help="Simple rules catch the common cases (jobs, free stuff, store hours). The AI sorts the rest.")
 
 
-@st.cache_data(ttl=300, show_spinner="Auditing search terms…")
+@st.cache_data(ttl=300, show_spinner="Checking your searches…")
 def run(days: int, min_cost: float, use_llm: bool):
     llm = None
     if use_llm:
@@ -32,25 +34,27 @@ def run(days: int, min_cost: float, use_llm: bool):
 
 df = run(days, min_cost, use_llm)
 if df.empty:
-    st.info("No search term data in this window.")
+    st.info("No Google searches in this period.")
     st.stop()
 s = search_terms.summary(df)
 ui.kpi_row([
-    ui.kpi("Search terms", f"{s['terms']:,}"),
-    ui.kpi("Flagged", f"{s['flagged']:,}", note="no buyer intent"),
-    ui.kpi("Wasted spend", ui.money(s["wasted_spend"], 2)),
-    ui.kpi("Share of search spend", f"{s['wasted_share']:.1%}"),
+    ui.kpi("Searches checked", f"{s['terms']:,}", note=f"last {days} days"),
+    ui.kpi("Not buyers", f"{s['flagged']:,}", note="searches to block"),
+    ui.kpi(plain.label("wasted"), ui.money(s["wasted_spend"], 2), note="paid for clicks that won't sell",
+           help=plain.explain("wasted")),
+    ui.kpi("Share of search budget", f"{s['wasted_share']:.0%}", note="went to these searches"),
 ])
+df = df.assign(kind=df.intent.map(plain.intent), by=df.classified_by.map({"rule": "Rule", "llm": "AI"}).fillna("Rule"))
 
 left, right = st.columns([3, 2])
 with right:
-    by = df[df.flagged].groupby("intent", as_index=False)["wasted_spend"].sum().sort_values("wasted_spend")
-    fig = go.Figure(go.Bar(y=by.intent.str.title(), x=by.wasted_spend, orientation="h",
+    by = df[df.flagged].groupby("kind", as_index=False)["wasted_spend"].sum().sort_values("wasted_spend")
+    fig = go.Figure(go.Bar(y=by.kind, x=by.wasted_spend, orientation="h",
                            marker_color=ui.SERIES[1], text=[ui.money(v) for v in by.wasted_spend],
                            textposition="outside", hovertemplate="%{y}: $%{x:,.2f}<extra></extra>"))
-    fig.update_layout(title="Wasted spend by intent", showlegend=False)
-    fig = ui.style_fig(fig, height=240)
-    fig.update_xaxes(tickprefix="$", showgrid=True, gridcolor="#eeede9")
+    fig.update_layout(title="Where the money went", showlegend=False)
+    fig = ui.style_fig(fig, height=250)
+    fig.update_xaxes(tickprefix="$", showgrid=True, gridcolor="#EEF0F4")
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig, width="stretch")
     camp = df[df.flagged].groupby("campaign_name", as_index=False)["wasted_spend"].sum().sort_values(
@@ -59,32 +63,38 @@ with right:
         "campaign_name": "Campaign", "wasted_spend": st.column_config.NumberColumn("Wasted", format="$%.2f")})
 
 with left:
-    ui.section("Flagged terms")
-    st.caption("Tick the terms to block, then queue them. Negatives are only added after approval.")
+    ui.section("Searches to block")
+    st.caption("Untick any you want to keep. Blocking only happens after you approve it on the Suggestions page.")
     flagged = df[df.flagged].copy()
-    flagged.insert(0, "queue", True)
+    flagged.insert(0, "block", True)
     edited = st.data_editor(
-        flagged[["queue", "search_term", "campaign_name", "ad_group_name", "clicks", "cost", "conversions", "intent",
-                 "reason", "suggested_negative", "classified_by"]],
+        flagged[["block", "search_term", "reason", "cost", "clicks", "conversions", "campaign_name", "kind",
+                 "suggested_negative", "by"]],
         hide_index=True, width="stretch", height=min(520, 40 + 35 * len(flagged)),
-        disabled=[c for c in flagged.columns if c != "queue"],
+        disabled=[c for c in flagged.columns if c != "block"],
         column_config={
-            "queue": st.column_config.CheckboxColumn("Block", width="small"),
-            "search_term": st.column_config.TextColumn("Search term", width="medium"),
-            "campaign_name": "Campaign", "ad_group_name": "Ad group",
+            "block": st.column_config.CheckboxColumn("Block", width="small"),
+            "search_term": st.column_config.TextColumn(plain.label("search_term"), width="medium",
+                                                      help=plain.explain("search_term")),
+            "reason": st.column_config.TextColumn("Why it's wasted", width="medium"),
             "cost": st.column_config.NumberColumn("Cost", format="$%.2f"),
-            "conversions": st.column_config.NumberColumn("Conv.", format="%.0f"),
-            "suggested_negative": "Negative keyword", "classified_by": "By",
+            "conversions": st.column_config.NumberColumn("Sales", format="%.0f"),
+            "campaign_name": "Campaign", "kind": "Type of searcher",
+            "suggested_negative": st.column_config.TextColumn("Block as", help="What gets added to Google's blocked "
+                                                              "list. Quotes block any search containing the words; "
+                                                              "[brackets] block only that exact search."),
+            "by": st.column_config.TextColumn("Sorted by", width="small"),
         })
-    chosen = edited[edited.queue]["search_term"].tolist()
+    chosen = edited[edited.block]["search_term"].tolist()
     b1, b2 = st.columns(2)
-    if b1.button(f"Queue {len(chosen)} negative keyword(s) for approval", type="primary", disabled=not chosen,
+    if b1.button(f"Add {len(chosen)} search(es) to suggestions", type="primary", disabled=not chosen,
                  width="stretch"):
         n = recs.save(recs.audit_recommendations(df, chosen))
-        st.success(f"{n} new negative keyword recommendation(s) added to **Approvals**"
-                   + ("" if n == len(chosen) else f" ({len(chosen) - n} were already pending)."))
-    b2.download_button("Download full audit (CSV)", df.to_csv(index=False), f"search_term_audit_{days}d.csv",
+        st.success(f"Added {n} search(es) to **Suggestions**"
+                   + ("." if n == len(chosen) else f" ({len(chosen) - n} were already there)."))
+    b2.download_button("Download all searches (CSV)", df.to_csv(index=False), f"wasted_searches_{days}d.csv",
                        "text/csv", width="stretch")
 
-with st.expander(f"All {len(df)} terms"):
-    st.dataframe(df.drop(columns=["rule"]), hide_index=True, width="stretch")
+with st.expander(f"See all {len(df)} searches, including good ones"):
+    view = df.drop(columns=["rule", "intent", "classified_by"], errors="ignore")
+    st.dataframe(ui.friendly_df(view), hide_index=True, width="stretch")

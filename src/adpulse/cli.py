@@ -143,9 +143,13 @@ def audit(days: int = 30, save: bool = typer.Option(False, help="Queue flagged t
 
 
 @app.command()
-def recommend(window: int = 30):
+def recommend(window: int = 30,
+              refresh: bool = typer.Option(False, help="Rebuild waiting suggestions with current wording/numbers")):
     """Generate pause/scale recommendations (pending human approval)."""
     from .actions import recommendations as recs
+    if refresh:
+        console.print(f"[green]✓[/] refreshed: {recs.refresh_pending(window)} suggestion(s) waiting for approval")
+        return
     found = recs.rule_recommendations(window)
     n = recs.save(found)
     console.print(f"[green]✓[/] {len(found)} recommendation(s) found, {n} new queued for approval")

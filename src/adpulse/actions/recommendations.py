@@ -98,19 +98,23 @@ def rule_recommendations(window_days: int = 30) -> list[Rec]:
         metrics["window_days"] = window_days
         if new_c == 0:
             recs.append(Rec("pause_ad", r["platform"], r["ad_id"], r["ad_name"], r["campaign_name"],
-                            f"Spent ${spend:,.2f} in {window_days} days with zero new customers.", metrics, spend))
+                            f"Spent ${spend:,.2f} in the last {window_days} days without winning a single new "
+                            "customer.", metrics, spend))
         elif ratio is not None and not pd.isna(ratio) and ratio < 1.0 and cac > s.target_cac:
             recs.append(Rec("pause_ad", r["platform"], r["ad_id"], r["ad_name"], r["campaign_name"],
-                            f"CAC ${cac:,.2f} is above the ${s.target_cac:,.0f} target and customers are worth "
-                            f"only ${r['ltv_estimate']:,.2f} (LTV:CAC {ratio:.2f}). Each customer loses money.",
+                            f"Each new customer costs ${cac:,.2f} to win (your target is ${s.target_cac:,.0f}) "
+                            f"but only spends about ${r['ltv_estimate']:,.2f}. You lose money on every customer "
+                            "this ad brings in.",
                             metrics, spend))
         elif (ratio is not None and not pd.isna(ratio) and ratio >= 2.5 and cac <= s.target_cac
               and roas is not None and not pd.isna(roas) and roas >= s.target_roas * 0.5):
             extra = spend * SCALE_STEP
             value = extra / cac * float(r["ltv_estimate"]) - extra
             recs.append(Rec("scale_ad", r["platform"], r["ad_id"], r["ad_name"], r["campaign_name"],
-                            f"LTV:CAC {ratio:.2f} with CAC ${cac:,.2f} under the ${s.target_cac:,.0f} target. "
-                            f"Suggest +{int(SCALE_STEP * 100)}% budget and watch CAC.", metrics, round(value, 2)))
+                            f"Each new customer costs only ${cac:,.2f} and is worth about "
+                            f"${r['ltv_estimate']:,.2f}, {ratio:.1f}× what they cost. Try "
+                            f"{int(SCALE_STEP * 100)}% more budget and keep an eye on the cost per customer.",
+                            metrics, round(value, 2)))
     return recs
 
 
@@ -122,8 +126,8 @@ def audit_recommendations(audit_df: pd.DataFrame, terms: list[str] | None = None
     for r in flagged.to_dict("records"):
         recs.append(Rec("negative_keyword", "google", f"{r['ad_group_name']}|{r['search_term']}",
                         r["search_term"], r["campaign_name"],
-                        f"{r['reason']}. ${r['cost']:,.2f} spent, {r['conversions']:.0f} conversions. "
-                        f"Add negative {r['suggested_negative']} to ad group '{r['ad_group_name']}'.",
+                        f"{r['reason']}. These clicks cost ${r['cost']:,.2f} and led to {r['conversions']:.0f} "
+                        f"sales. Stop showing ads for {r['suggested_negative']} in '{r['ad_group_name']}'.",
                         {"clicks": int(r["clicks"]), "cost": float(r["cost"]), "conversions": float(r["conversions"]),
                          "intent": r["intent"], "suggested_negative": r["suggested_negative"],
                          "ad_group_name": r["ad_group_name"]},
@@ -163,6 +167,25 @@ def save(recs: list[Rec]) -> int:
             "id", "created_at", "kind", "platform", "entity_id", "entity_name", "campaign_name", "reason",
             "metrics", "est_impact", "status", "decided_by", "decided_at", "note", "source", "version"])
     return len(rows)
+
+
+def refresh_pending(window_days: int = 30) -> int:
+    """Rebuild suggestions still waiting for a decision (rule and audit ones) so their wording and numbers are
+    current. Decided suggestions and ones added from chat are left alone. Returns how many are pending after."""
+    from ..audit import search_terms
+
+    pending = latest("pending")
+    if not pending.empty:
+        stale = pending[pending.source.isin(["rules", "audit"])]
+        terms = stale[stale.source == "audit"].entity_name.tolist()
+        if not stale.empty:
+            ids = ", ".join(f"'{i}'" for i in stale.id if str(i).isalnum())
+            warehouse.command(f"ALTER TABLE app_recommendations DELETE WHERE id IN ({ids}) "
+                              "SETTINGS mutations_sync = 2")
+        if terms:
+            save(audit_recommendations(search_terms.audit(window_days, llm=None), terms))
+    save(rule_recommendations(window_days))
+    return len(latest("pending"))
 
 
 def decide(rec_id: str, status: str, by: str, note: str = "") -> None:

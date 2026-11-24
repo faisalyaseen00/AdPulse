@@ -12,7 +12,8 @@ class ChartSpec(BaseModel):
     x: str = Field(default="", description="Result column for the x axis (or categories).")
     y: str = Field(default="", description="Numeric result column for the y axis.")
     color: str = Field(default="", description="Optional result column to colour by.")
-    title: str = ""
+    title: str = Field(default="", description="Chart title in plain words a business owner understands, "
+                                             "e.g. 'Cost to win one new customer, by month'. No abbreviations.")
 
 
 class SQLPlan(BaseModel):
@@ -42,8 +43,11 @@ class Computation(BaseModel):
 
 
 class Narrative(BaseModel):
-    headline: str = Field(description="One-sentence direct answer.")
-    answer_markdown: str = Field(description="Supporting evidence as markdown bullets (<= 180 words). Do not repeat the headline. Only numbers from the result.")
+    headline: str = Field(description="One confident sentence in everyday words that answers the question, "
+                                      "with the key number. No marketing abbreviations.")
+    answer_markdown: str = Field(description="2-4 short markdown bullets in plain words, each starting with a bold phrase, optionally "
+                                 "ending with a '**What to do:**' line. Under 140 words. Do not repeat the headline. "
+                                 "Only numbers from the result.")
     computations: list[Computation] = Field(
         default_factory=list,
         description="Every number in the answer that is NOT copied verbatim from a result cell, with its arithmetic.")

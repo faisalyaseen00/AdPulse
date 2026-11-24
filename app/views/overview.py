@@ -1,14 +1,21 @@
+import html
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import ui
 
-ui.hero("Overview", "Ads → clicks → customers → revenue → lifetime value, from the warehouse.", icon="📊")
+from adpulse import plain
+from adpulse.actions import recommendations as recs
+from adpulse.audit import search_terms
+from adpulse.config import get_settings
+
 if not ui.require_warehouse():
     st.stop()
 
-window = st.segmented_control("Window", [7, 30, 90], default=30, format_func=lambda d: f"Last {d} days",
-                              label_visibility="collapsed") or 30
+top_l, top_r = st.columns([3, 2], vertical_alignment="center")
+window = top_r.segmented_control("Period", [7, 30, 90], default=30, format_func=lambda d: f"Last {d} days",
+                                 label_visibility="collapsed") or 30
 
 k = ui.q(
     """
@@ -25,7 +32,7 @@ k = ui.q(
       e AS end_date
     FROM fct_ad_daily
     """, (("w", window),)).iloc[0].astype(float, errors="ignore").rename({"spend_cur": "spend", "clicks_cur": "clicks",
-                                            "impressions_cur": "impressions"})
+                                                                         "impressions_cur": "impressions"})
 
 
 def chg(a, b):
@@ -35,26 +42,98 @@ def chg(a, b):
 
 roas, roas_p = (k.rev / k.spend if k.spend else 0), (k.rev_p / k.spend_p if k.spend_p else 0)
 cac, cac_p = (k.spend / k.cust if k.cust else 0), (k.spend_p / k.cust_p if k.cust_p else 0)
-st.caption(f"Data through **{pd.Timestamp(k.end_date):%b %d, %Y}** · compared with the prior {window} days")
+end = pd.Timestamp(k.end_date)
+period = "before"
+top_l.caption(f"Showing the last {window} days, up to {end:%B %-d, %Y}, compared with the {window} days before.")
+
+# ---- The verdict: one sentence a boss can read in three seconds -----------------------------------------
+if roas >= 1.5:
+    tail = ", a healthy return"
+elif roas >= 1:
+    tail = ", so ads are paying for themselves"
+else:
+    tail = ", less than they cost"
+rev_change = chg(k.rev, k.rev_p)
+more = (f"You spent <b>{ui.money(k.spend)}</b> on ads and won <b>{k.cust:,.0f} new customers</b> at "
+        f"<b>{ui.money(cac, 2)}</b> each. ")
+if k.ltv90 and not pd.isna(k.ltv90) and cac:
+    more += (f"A new customer spends about <b>{ui.money(k.ltv90, 2)}</b> in their first 90 days, "
+             f"so each one is worth <b>{plain.times(k.ltv90 / cac)}</b> what it cost to win them. ")
+if rev_change is not None:
+    more += f"Sales from ads: {ui.change_text(rev_change, 'up', period)}."
+ui.verdict(f"Your ads brought back <b>{plain.per_dollar(roas)}</b> for every $1 you spent{tail}.", more)
+
+# ---- Numbers at a glance --------------------------------------------------------------------------------
 ui.kpi_row([
-    ui.kpi("Ad spend", ui.money(k.spend), chg(k.spend, k.spend_p), "down"),
-    ui.kpi("Paid revenue", ui.money(k.rev), chg(k.rev, k.rev_p)),
-    ui.kpi("ROAS", f"{roas:.2f}x", chg(roas, roas_p)),
-    ui.kpi("New paid customers", f"{k.cust:,.0f}", chg(k.cust, k.cust_p)),
-    ui.kpi("Blended CAC", ui.money(cac, 2), chg(cac, cac_p), "down"),
-    ui.kpi("90-day LTV", ui.money(k.ltv90, 2), note="mature paid customers"),
+    ui.kpi(plain.label("spend"), ui.money(k.spend), chg(k.spend, k.spend_p), "down", help=plain.explain("spend"),
+           period=period),
+    ui.kpi(plain.label("paid_revenue"), ui.money(k.rev), chg(k.rev, k.rev_p), help=plain.explain("paid_revenue"),
+           period=period),
+    ui.kpi(plain.label("roas"), plain.per_dollar(roas), chg(roas, roas_p), help=plain.explain("roas"), period=period),
+    ui.kpi(plain.label("new_customers"), f"{k.cust:,.0f}", chg(k.cust, k.cust_p), help=plain.explain("new_customers"),
+           period=period),
+    ui.kpi(plain.label("cac"), ui.money(cac, 2), chg(cac, cac_p), "down", help=plain.explain("cac"), period=period),
+    ui.kpi(plain.label("ltv90"), ui.money(k.ltv90, 2), note="per customer, first 90 days", help=plain.explain("ltv90")),
 ])
 
-ui.section("Funnel", "paid traffic, same window")
-flow = [("Impressions", f"{k.impressions:,.0f}", ""), ("Clicks", f"{k.clicks:,.0f}",
-        f"CTR {k.clicks / k.impressions:.2%}" if k.impressions else ""),
-        ("Sessions", f"{k.sessions:,.0f}", f"{k.sessions / k.clicks:.0%} of clicks" if k.clicks else ""),
-        ("New customers", f"{k.cust:,.0f}", f"CVR {k.cust / k.sessions:.2%}" if k.sessions else ""),
-        ("Revenue", ui.money(k.rev), f"ROAS {roas:.2f}x"), ("90-day LTV", ui.money(k.ltv90, 2), "per customer")]
-st.html('<div class="ap-flow">' + '<div class="arr">→</div>'.join(
-    f'<div class="node"><div class="t">{t}</div><div class="v">{v}</div><div class="s">{s}</div></div>'
+
+# ---- What to do this week -------------------------------------------------------------------------------
+@st.cache_data(ttl=300, show_spinner=False)
+def wasted(days: int) -> dict:
+    return search_terms.summary(search_terms.audit(days, llm=None))
+
+
+pending = recs.latest()
+pending = pending[pending.status == "pending"] if not pending.empty else pending
+items = []
+if not pending.empty:
+    scale = pending[pending.kind == "scale_ad"].sort_values("est_impact", ascending=False)
+    pause = pending[pending.kind == "pause_ad"].sort_values("est_impact", ascending=False)
+    if not scale.empty:
+        r = scale.iloc[0]
+        m = r.metrics
+        items.append(("good", f"Give “{r.entity_name}” more budget",
+                      (f"Each new customer from this ad costs {ui.money(m.get('cac_window'), 2)} and is worth "
+                       f"about {ui.money(m.get('ltv_estimate'), 2)}."),
+                      f"+{ui.money(r.est_impact)}", "extra customer value / month"))
+    if not pause.empty:
+        r = pause.iloc[0]
+        m = r.metrics
+        detail = (f"Each new customer costs {ui.money(m.get('cac_window'), 2)} but only spends "
+                  f"{ui.money(m.get('ltv_estimate'), 2)}." if m.get("new_customers_window")
+                  else f"It spent {ui.money(m.get('spend_window'))} without winning a single new customer.")
+        items.append(("bad", f"Pause “{r.entity_name}”", detail, ui.money(r.est_impact), "saved / month"))
+w = wasted(30)
+if w["flagged"]:
+    items.append(("warn", f"Block {w['flagged']} searches that never turn into sales",
+                  "People searching for jobs, free samples or store hours are clicking your ads.",
+                  ui.money(w["wasted_spend"]), "wasted in 30 days"))
+
+ui.section("What to do this week", "nothing changes until you approve it")
+if items:
+    ui.todo(items)
+    b1, b2, _ = st.columns([1, 1, 2])
+    b1.page_link("views/recommendations.py", label="Review suggestions", icon=":material/task_alt:")
+    b2.page_link("views/audit.py", label="See wasted searches", icon=":material/money_off:")
+else:
+    st.success("Nothing needs your attention right now.")
+
+# ---- From ad to customer --------------------------------------------------------------------------------
+ui.section("From ad to customer", f"last {window} days")
+flow = [
+    (plain.label("impressions"), f"{k.impressions:,.0f}", "times your ads were shown"),
+    (plain.label("clicks"), f"{k.clicks:,.0f}",
+     f"{k.clicks / k.impressions:.1%} of views" if k.impressions else ""),
+    (plain.label("sessions"), f"{k.sessions:,.0f}", "visits to your website"),
+    ("New customers", f"{k.cust:,.0f}", f"{k.cust / k.sessions:.1%} of visits bought" if k.sessions else ""),
+    (plain.label("paid_revenue"), ui.money(k.rev), f"{plain.per_dollar(roas)} back per $1"),
+    (plain.label("ltv90"), ui.money(k.ltv90, 2), "per customer"),
+]
+st.html('<div class="ap-flow">' + "".join(
+    f'<div class="node"><div class="t">{html.escape(t)}</div><div class="v">{v}</div><div class="s">{html.escape(s)}</div></div>'
     for t, v, s in flow) + "</div>")
 
+# ---- Charts ---------------------------------------------------------------------------------------------
 c1, c2 = st.columns([3, 2])
 with c1:
     wk = ui.q("""
@@ -67,11 +146,11 @@ with c1:
     """)
     wk = wk.iloc[1:-1] if len(wk) > 3 else wk  # drop partial edge weeks
     fig = go.Figure()
+    fig.add_trace(go.Scatter(x=wk.week, y=wk.revenue, name="Sales from ads", mode="lines",
+                             line={"color": ui.SERIES[1], "width": 2.5}, hovertemplate="$%{y:,.0f}"))
     fig.add_trace(go.Scatter(x=wk.week, y=wk.spend, name="Ad spend", mode="lines",
-                             line={"color": ui.SERIES[0], "width": 2}, hovertemplate="$%{y:,.0f}"))
-    fig.add_trace(go.Scatter(x=wk.week, y=wk.revenue, name="Attributed revenue", mode="lines",
-                             line={"color": ui.SERIES[1], "width": 2}, hovertemplate="$%{y:,.0f}"))
-    fig.update_layout(title="Weekly spend vs. attributed revenue", hovermode="x unified")
+                             line={"color": ui.SERIES[0], "width": 2.5}, hovertemplate="$%{y:,.0f}"))
+    fig.update_layout(title="Ad spend and the sales it brought in, by week", hovermode="x unified")
     st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
 with c2:
     pl = ui.q("""
@@ -89,29 +168,46 @@ with c2:
     fig = go.Figure(go.Bar(x=m.platform.str.title(), y=m.cac, marker_color=[ui.PLATFORM_COLORS[p] for p in m.platform],
                            text=[ui.money(v, 2) for v in m.cac], textposition="outside",
                            customdata=m[["spend", "customers"]],
-                           hovertemplate="CAC $%{y:,.2f}<br>Spend $%{customdata[0]:,.0f}<br>"
-                                         "Customers %{customdata[1]:,.0f}<extra></extra>"))
-    fig.update_layout(title="CAC by platform", showlegend=False)
+                           hovertemplate="Cost per new customer $%{y:,.2f}<br>Ad spend $%{customdata[0]:,.0f}<br>"
+                                         "New customers %{customdata[1]:,.0f}<extra></extra>"))
+    fig.update_layout(title="Cost to win one new customer", showlegend=False)
     st.plotly_chart(ui.style_fig(fig, money_axis=True), width="stretch")
 
-ui.section("Ad scorecard", f"spend and CAC over the last {window} days")
-st.caption("LTV is the 90-day value of each ad's mature customers (or lifetime value when none are 90 days old yet).")
-from adpulse.actions.recommendations import ad_economics
+# ---- Every ad, judged -----------------------------------------------------------------------------------
+ui.section("How each ad is doing", f"last {window} days")
+target = get_settings().target_cac
+sc = recs.ad_economics(window)
 
-sc = ad_economics(window)
-sc = sc[["ad_name", "platform", "campaign_name", "spend_window", "new_customers_window", "cac_window",
-         "ltv_estimate", "ltv_to_cac", "roas_window"]]
+
+def verdict_for(r) -> str:
+    ratio, n = r.ltv_to_cac, r.new_customers_window or 0
+    if n == 0 or (pd.notna(ratio) and ratio < 1):
+        return "🔴 Losing money"
+    if pd.notna(ratio) and ratio >= 2.5 and (r.cac_window or 0) <= target:
+        return "🟢 Worth more budget"
+    return "⚪ Doing OK"
+
+
+sc = sc.assign(verdict=sc.apply(verdict_for, axis=1), platform=sc.platform.str.title())
+sc = sc[["ad_name", "verdict", "platform", "spend_window", "new_customers_window", "cac_window", "ltv_estimate",
+         "ltv_to_cac", "roas_window"]]
 st.dataframe(
-    sc, hide_index=True, width="stretch", height=min(560, 38 + 35 * len(sc)),
+    sc, hide_index=True, width="stretch", height=min(600, 38 + 35 * len(sc)),
     column_config={
         "ad_name": st.column_config.TextColumn("Ad", width="medium"),
-        "platform": st.column_config.TextColumn("Platform", width="small"),
-        "campaign_name": "Campaign",
-        "spend_window": st.column_config.NumberColumn("Spend", format="$%.2f"),
+        "verdict": st.column_config.TextColumn("Verdict", width="medium",
+                                               help="Worth more budget: customers are worth at least 2.5× what they "
+                                                    "cost. Losing money: customers are worth less than they cost."),
+        "platform": st.column_config.TextColumn("Where", width="small"),
+        "spend_window": st.column_config.NumberColumn(plain.label("spend"), format="$%.0f"),
         "new_customers_window": st.column_config.NumberColumn("New customers", format="%d"),
-        "cac_window": st.column_config.NumberColumn("CAC", format="$%.2f"),
-        "ltv_estimate": st.column_config.NumberColumn("LTV", format="$%.2f"),
-        "ltv_to_cac": st.column_config.ProgressColumn("LTV : CAC", format="%.2f", min_value=0,
-                                                      max_value=float(max(4.0, sc.ltv_to_cac.max() or 0))),
-        "roas_window": st.column_config.NumberColumn("ROAS", format="%.2fx"),
+        "cac_window": st.column_config.NumberColumn(plain.label("cac"), format="$%.2f", help=plain.explain("cac")),
+        "ltv_estimate": st.column_config.NumberColumn(plain.label("ltv"), format="$%.2f", help=plain.explain("ltv")),
+        "ltv_to_cac": st.column_config.ProgressColumn(plain.label("ltv_to_cac"), format="%.1f×", min_value=0,
+                                                      max_value=float(max(4.0, sc.ltv_to_cac.max() or 0)),
+                                                      help=plain.explain("ltv_to_cac")),
+        "roas_window": st.column_config.NumberColumn(plain.label("roas"), format="$%.2f", help=plain.explain("roas")),
     })
+
+ui.glossary(["spend", "paid_revenue", "roas", "new_customers", "cac", "ltv", "ltv90", "ltv_to_cac",
+             "impressions", "ctr", "sessions"])

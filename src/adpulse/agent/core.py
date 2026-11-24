@@ -16,7 +16,7 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 
-from .. import warehouse
+from .. import plain, warehouse
 from ..config import get_settings
 from ..llm import LLM, LLMError
 from . import prompts
@@ -147,11 +147,18 @@ class AdPulseAgent:
         narrative = self._narrate(context, question, plan, df, ans)
         checks = _check(narrative, df, question)
         bad = [c for c in checks if not c.verified]
-        if bad:
-            ans.steps.append(Step("verify numbers", "retry",
-                                  f"{len(bad)} number(s) not found in result: {', '.join(c.text for c in bad)}"))
-            narrative = self._narrate(context, question, plan, df, ans, unverified=[c.text for c in bad])
+        jargon = plain.find_jargon(_reader_text(narrative))
+        if bad or jargon:
+            if bad:
+                ans.steps.append(Step("verify numbers", "retry",
+                                      f"{len(bad)} number(s) not found in result: {', '.join(c.text for c in bad)}"))
+            if jargon:
+                ans.steps.append(Step("plain language", "retry", f"rewriting shorthand: {', '.join(jargon)}"))
+            narrative = self._narrate(context, question, plan, df, ans, unverified=[c.text for c in bad],
+                                      jargon=jargon)
             checks = _check(narrative, df, question)
+        if plain.find_jargon(_reader_text(narrative)):
+            narrative = _unjargon(narrative)
         n, ok = summarize(checks)
         ans.steps.append(Step("verify numbers", "ok" if n == ok else "fail", f"{ok}/{n} numbers traced to the result"))
 
@@ -203,13 +210,17 @@ class AdPulseAgent:
         return review
 
     def _narrate(self, context: str, question: str, plan: SQLPlan, df: pd.DataFrame, ans: AgentAnswer,
-                 unverified: list[str] | None = None) -> Narrative:
+                 unverified: list[str] | None = None, jargon: list[str] | None = None) -> Narrative:
         t = time.perf_counter()
         extra = ""
         if unverified:
-            extra = ("\n\nYour previous draft quoted numbers that are NOT in the result: "
-                     f"{', '.join(unverified)}. Rewrite using only numbers from the result table, and declare "
-                     "any ratio or difference in `computations` with its arithmetic.")
+            extra += ("\n\nYour previous draft quoted numbers that are NOT in the result: "
+                      f"{', '.join(unverified)}. Rewrite using only numbers from the result table, and declare "
+                      "any ratio or difference in `computations` with its arithmetic.")
+        if jargon:
+            extra += ("\n\nYour previous draft used shorthand a business owner won't know: "
+                      f"{', '.join(jargon)}. Rewrite in everyday words (for example 'money back per $1 spent', "
+                      "'cost per new customer', 'customer value'). Keep the same numbers.")
         nar = self.llm.structured(
             system=NARRATOR, user=(f"{context}\n\nQuestion: {question}\n\nAssumptions: {plan.assumptions}\n\n"
                                    f"Result (verified SQL):\n{prompts.format_result(df)}{extra}"),
@@ -240,6 +251,18 @@ class AdPulseAgent:
 
 
 NARRATOR = prompts.NARRATOR_SYSTEM
+
+
+def _reader_text(n: Narrative) -> str:
+    return " ".join([n.headline, n.answer_markdown, *n.caveats, *(a.rationale for a in n.suggested_actions)])
+
+
+def _unjargon(n: Narrative) -> Narrative:
+    return n.model_copy(update={
+        "headline": plain.unjargon(n.headline), "answer_markdown": plain.unjargon(n.answer_markdown),
+        "caveats": [plain.unjargon(c) for c in n.caveats],
+        "suggested_actions": [a.model_copy(update={"rationale": plain.unjargon(a.rationale)})
+                              for a in n.suggested_actions]})
 
 
 def _check(n: Narrative, df: pd.DataFrame, question: str) -> list[NumberCheck]:
