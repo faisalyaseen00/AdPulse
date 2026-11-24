@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -72,13 +73,13 @@ header[data-testid="stHeader"] { background: transparent; }
 .ap-section span { color: var(--ap-muted); font-size: .84rem; }
 
 /* KPI tiles */
-.ap-kpi { position:relative; background: var(--ap-surface); border:1px solid var(--ap-border); border-radius: var(--ap-radius);
+.ap-kpi { container-type: inline-size; position:relative; background: var(--ap-surface); border:1px solid var(--ap-border); border-radius: var(--ap-radius);
   padding: 14px 16px 13px; height: 100%; box-shadow: var(--ap-shadow); transition: box-shadow .15s, transform .15s; overflow:hidden; }
 .ap-kpi::after { content:""; position:absolute; left:0; right:0; top:0; height:3px;
   background: linear-gradient(90deg, var(--ap-brand), var(--ap-brand-2)); opacity:.85; }
 .ap-kpi:hover { box-shadow: var(--ap-shadow-lg); transform: translateY(-1px); }
 .ap-kpi .lbl { color: var(--ap-muted); font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight:600; text-transform: uppercase; letter-spacing: .05em; }
-.ap-kpi .val { font-size: clamp(1.05rem, 1.45vw, 1.6rem); white-space: nowrap; font-weight: 700; margin-top: 4px; color: var(--ap-ink); font-variant-numeric: tabular-nums; letter-spacing:-.02em; }
+.ap-kpi .val { font-size: clamp(0.85rem, 15cqi, 1.6rem); white-space: nowrap; font-weight: 700; margin-top: 4px; color: var(--ap-ink); font-variant-numeric: tabular-nums; letter-spacing:-.02em; }
 .ap-kpi .sub { font-size: .78rem; margin-top: 4px; color: var(--ap-muted); font-variant-numeric: tabular-nums; }
 .ap-kpi .chip { display:inline-block; padding:1px 7px; border-radius:999px; font-weight:600; margin-right:4px; }
 .ap-kpi .up { color: var(--ap-good); background:#ecfdf3; } .ap-kpi .down { color: var(--ap-bad); background:#fef3f2; }
@@ -147,7 +148,6 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 .ap-step .ms { color: var(--ap-muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 3.6rem; }
-  .ap-kpi .val { font-size: 1.45rem; }
   .ap-hero { padding: 14px 16px; } .ap-hero .ic { display:none; } .ap-hero h1 { font-size: 1.3rem; }
 }
 </style>
@@ -240,8 +240,14 @@ def clear_cache() -> None:
 def require_warehouse() -> bool:
     h = warehouse.health()
     if not h.ok:
-        st.error(f"Cannot reach ClickHouse at {get_settings().clickhouse_host}:{get_settings().clickhouse_port}.\n\n"
-                 f"`{h.error[:300]}`\n\nStart it with `docker compose up -d clickhouse` (see README).")
+        s = get_settings()
+        if s.clickhouse_host in ("localhost", "127.0.0.1") and Path("/mount/src").exists():
+            st.error("**No database settings found.** On Streamlit Cloud, open the app's **⋮ → Settings → Secrets**, "
+                     "paste the contents of `streamlit-secrets.toml`, and click **Save**. The app restarts by itself.")
+            return False
+        st.error(f"Cannot reach ClickHouse at {s.clickhouse_host}:{s.clickhouse_port}.\n\n"
+                 f"`{h.error[:300]}`\n\nLocally, start it with `docker compose up -d clickhouse` (see README). "
+                 "On ClickHouse Cloud, check the service is running and its IP access list allows connections.")
         return False
     try:
         n = warehouse.query_df("SELECT count() AS n FROM fct_ad_daily").iloc[0]["n"]

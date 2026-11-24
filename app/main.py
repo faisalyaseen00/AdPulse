@@ -2,11 +2,36 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import streamlit as st
 
 st.set_page_config(page_title="AdPulse", page_icon=str(Path(__file__).parent / "assets" / "icon.svg"), layout="wide", initial_sidebar_state="expanded")
+
+
+
+def _load_streamlit_secrets() -> None:
+    """Streamlit Cloud keeps settings in st.secrets. Copy top-level values into the environment, where
+    AdPulse's settings read them. Values already in the environment win; no secrets file is fine."""
+    try:
+        items = {k: st.secrets[k] for k in st.secrets}
+    except Exception:  # noqa: BLE001  (no secrets.toml locally)
+        return
+    loaded = False
+    for key, value in items.items():
+        if isinstance(value, (str, int, float, bool)) and key.upper() not in os.environ:
+            os.environ[key.upper()] = str(value)
+            loaded = True
+    if loaded:
+        from adpulse import warehouse as _wh
+        from adpulse.config import get_settings as _gs
+        _gs.cache_clear()
+        _wh.admin.cache_clear()
+        _wh.reader.cache_clear()
+
+
+_load_streamlit_secrets()
 
 import ui
 
