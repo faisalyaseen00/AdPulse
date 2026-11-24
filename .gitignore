@@ -1,16 +1,44 @@
+# --- Python / tooling ---
 .venv/
+.venv-*/
 __pycache__/
 *.pyc
-.env
-data/demo/
-data/reports/
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
-*.egg-info/
 .DS_Store
 .claude/
-.venv-*/
 
-# cloud deploy secrets (never commit)
+# --- Generated data ---
+data/
+*.csv.gz
+ch_backup*.tgz
+
+# --- Secrets and credentials: never commit ---
+# environment files (the template .env.example is the only one tracked)
+.env
+.env.*
+*.env
+!.env.example
+# deploy secrets written by scripts/cloud_setup.py, and Streamlit's local secrets
 streamlit-secrets.toml
 .streamlit/secrets.toml
+secrets.toml
+*secrets*.toml
+# downloaded credentials (ClickHouse Cloud, Google, other services)
+*credentials*
+*.credentials
+client_secret*.json
+service-account*.json
+*-sa.json
+token.json
+# keys and certificates (e.g. the Oracle / SSH key you download)
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+ssh-key-*
+# Airbyte local install data
+.airbyte/

@@ -53,6 +53,22 @@ def read_env(path: Path) -> dict[str, str]:
     return out
 
 
+def strong_password() -> str:
+    """Meets ClickHouse Cloud's policy (length, upper, lower, digit, special); no quotes or backslashes."""
+    return "Ap9!" + secrets.token_urlsafe(24)
+
+
+def policy_ok(pw: str) -> bool:
+    return (len(pw) >= 12 and any(c.isupper() for c in pw) and any(c.islower() for c in pw)
+            and any(c.isdigit() for c in pw) and any(not c.isalnum() for c in pw))
+
+
+def write_secrets(cfg: dict[str, str]) -> None:
+    body = "# AdPulse secrets: paste into Streamlit Cloud (Settings -> Secrets) and GitHub secret ADPULSE_SECRETS.\n"
+    body += "".join(f"{k} = {json.dumps(str(v))}\n" for k, v in cfg.items())
+    OUT.write_text(body)
+    OUT.chmod(0o600)
+
 def ask(prompt: str, current: str = "", secret: bool = False) -> str:
     hint = " (Enter keeps saved value)" if current else ""
     v = (getpass.getpass if secret else input)(f"{prompt}{hint}: ").strip()
@@ -79,11 +95,14 @@ def main() -> int:
         "CLICKHOUSE_HOST": host, "CLICKHOUSE_PORT": "8443", "CLICKHOUSE_SECURE": "true",
         "CLICKHOUSE_USER": user, "CLICKHOUSE_PASSWORD": pwd, "CLICKHOUSE_DATABASE": "adpulse",
         "CLICKHOUSE_READER_USER": "adpulse_reader",
-        "CLICKHOUSE_READER_PASSWORD": saved.get("CLICKHOUSE_READER_PASSWORD") or secrets.token_hex(24),
+        "CLICKHOUSE_READER_PASSWORD": (saved.get("CLICKHOUSE_READER_PASSWORD")
+                                       if policy_ok(saved.get("CLICKHOUSE_READER_PASSWORD", ""))
+                                       else strong_password()),
     })
     if app_url:
         cfg["APP_BASE_URL"] = app_url.rstrip("/")
 
+    write_secrets(cfg)  # saved first, so a re-run after a failure doesn't ask for everything again
     print("\nCreating tables, the read-only user and loading demo data in ClickHouse Cloud (1-3 minutes)...")
     env = {**os.environ, **cfg}
     adpulse = ROOT / ".venv" / "bin" / "adpulse"
@@ -93,10 +112,6 @@ def main() -> int:
         print("\nBootstrap failed. Check the host/password, and that the service is running in ClickHouse Cloud.")
         return r.returncode
 
-    body = "# AdPulse secrets: paste into Streamlit Cloud (Settings -> Secrets) and GitHub secret ADPULSE_SECRETS.\n"
-    body += "".join(f"{k} = {json.dumps(str(v))}\n" for k, v in cfg.items())
-    OUT.write_text(body)
-    OUT.chmod(0o600)
     print(f"\nDone. Secrets file written: {OUT}")
     print("Next: copy its whole contents into Streamlit Cloud and GitHub (see docs/deploy-streamlit-cloud.md).")
     print("Never commit or share this file.")
