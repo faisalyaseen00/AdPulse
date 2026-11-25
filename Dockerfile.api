@@ -1,5 +1,5 @@
 # AdPulse API: the FastAPI layer the React web app talks to (api/main.py).
-# Built by Render from render.yaml; also runs anywhere Docker does:
+# Built by Railway (railway.json) or Render (render.yaml); also runs anywhere Docker does:
 #   docker build -f Dockerfile.api -t adpulse-api . && docker run --env-file .env -p 8000:8000 adpulse-api
 FROM python:3.11-slim
 

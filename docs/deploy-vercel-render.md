@@ -1,5 +1,7 @@
 # Deploy: Vercel (web) + Render (API) + ClickHouse Cloud
 
+> The API now runs on Railway: see [deploy-vercel-railway.md](deploy-vercel-railway.md). This guide is kept for reference.
+
 This puts the client-facing AdPulse online:
 
 ```

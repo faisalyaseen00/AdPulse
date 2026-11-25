@@ -27,9 +27,9 @@ npm run build         # type-check, then build into dist/
 ## Deploy (Vercel)
 
 - Root Directory: `web` (build settings, routing and caching come from `vercel.json`).
-- Environment variable: `VITE_API_URL` = the API's public address, e.g. `https://adpulse-api.onrender.com`.
+- Environment variable: `VITE_API_URL` = the API's public address, e.g. `https://adpulse-api-production.up.railway.app`.
 
-Full guide: [../docs/deploy-vercel-render.md](../docs/deploy-vercel-render.md).
+Full guide: [../docs/deploy-vercel-railway.md](../docs/deploy-vercel-railway.md).
 
 ## Structure
 

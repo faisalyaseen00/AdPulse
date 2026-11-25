@@ -37,7 +37,7 @@ a summary to Slack or email.
 | Part | Folder | Runs on | Notes |
 |---|---|---|---|
 | Web app | `web/` | **Vercel** | React 19, Vite, TypeScript, Tailwind CSS 4, TanStack Query, Recharts, Three.js robot. Talks only to the API; no keys in the browser. |
-| HTTP API | `api/` | **Render** (Docker) | FastAPI. A thin layer over `src/adpulse`; it adds no business logic of its own. |
+| HTTP API | `api/` | **Railway** (Docker) | FastAPI. A thin layer over `src/adpulse`; it adds no business logic of its own. |
 | Core package | `src/adpulse/` | inside the API, the CLI and GitHub Actions | Pipeline, SQL models, agent, audit, approvals, reports. |
 | Warehouse | n/a | **ClickHouse Cloud** | Admin user for loading, separate read-only user for the agent. |
 | Monday report | `.github/workflows/weekly-report.yml` | **GitHub Actions** | Secret `ADPULSE_SECRETS`. |
@@ -81,25 +81,27 @@ In development Vite forwards `/api` to `localhost:8000`, so no web environment v
 
 ## Deploy
 
-The production setup is **Vercel (web) + Render (API) + ClickHouse Cloud (data) + GitHub Actions (Monday report)**.
-Step-by-step guide: [docs/deploy-vercel-render.md](docs/deploy-vercel-render.md).
+The production setup is **Vercel (web) + Railway (API) + ClickHouse Cloud (data) + GitHub Actions (Monday report)**.
+Step-by-step guide: [docs/deploy-vercel-railway.md](docs/deploy-vercel-railway.md).
+(The earlier Render setup still works: [docs/deploy-vercel-render.md](docs/deploy-vercel-render.md).)
 
 In short:
 
 1. **ClickHouse Cloud** is already set up if the Streamlit app or the weekly report runs today. Otherwise follow
    [docs/deploy-streamlit-cloud.md](docs/deploy-streamlit-cloud.md) up to "Load the data".
-2. **API on Render:** New + → Blueprint → this repository. Render reads [`render.yaml`](render.yaml), builds
-   [`Dockerfile.api`](Dockerfile.api), and asks for the secret values (ClickHouse, Groq, Slack). Health check: `/healthz`.
+2. **API on Railway:** New Project → Deploy from GitHub repo → this repository. Railway reads
+   [`railway.json`](railway.json) and builds [`Dockerfile.api`](Dockerfile.api) (health check `/healthz`). Paste the
+   secret values (ClickHouse, Groq, Slack) under Variables, then Settings → Networking → Generate Domain.
 3. **Web on Vercel:** Add New → Project → this repository, **Root Directory `web`**. Set
-   `VITE_API_URL` to the Render address (for example `https://adpulse-api.onrender.com`) and deploy.
-4. **Back on Render:** set `ADPULSE_CORS_ORIGINS` to the Vercel address so the browser may call the API.
+   `VITE_API_URL` to the Railway address (for example `https://adpulse-api-production.up.railway.app`) and deploy.
+4. **Back on Railway:** set `ADPULSE_CORS_ORIGINS` to the Vercel address so the browser may call the API.
 
 Other options: one Ubuntu server with Docker ([docs/deploy-server.md](docs/deploy-server.md)), or the earlier
 Streamlit-only setup ([docs/deploy-streamlit-cloud.md](docs/deploy-streamlit-cloud.md)).
 
 ## Configuration
 
-All settings are environment variables (locally in `.env`; in production in the Render dashboard).
+All settings are environment variables (locally in `.env`; in production in the Railway dashboard).
 [`.env.example`](.env.example) lists every one. The ones that matter most:
 
 | Variable | Where | What |
@@ -178,7 +180,7 @@ adpulse ui                    the previous Streamlit interface
    so generated SQL cannot raise them. It cannot read the app's own `app_*` tables.
 3. **No automatic spend changes:** suggestions are proposals. Pending → approved/rejected (reviewer recorded)
    → done (a separate, explicit step after someone makes the change in Meta or Google).
-4. **No secrets in the browser:** the web app only calls the API; database and AI keys live on Render.
+4. **No secrets in the browser:** the web app only calls the API; database and AI keys live on Railway.
 5. Every question is logged in `app_questions` with its SQL, review verdict and number check.
 
 ## Tests
@@ -204,7 +206,7 @@ web/                 React web app (Vercel)
   src/components/    layout, charts, KPI figure, funnel, brand logos, robot launcher
   src/robot/         Three.js robot (React Three Fiber)
   public/            icon, brand logos, robot model
-api/main.py          FastAPI layer over src/adpulse (Render)
+api/main.py          FastAPI layer over src/adpulse (Railway)
 src/adpulse/
   pipeline/          demo_data.py · ingest.py (PyAirbyte / direct) · transform.py · connections.yaml
   sql/               schema.sql (raw + app tables) · models/*.sql (dim_/fct_/mart_)
@@ -218,6 +220,6 @@ app/                 previous Streamlit interface (kept for rollback)
 frontend/companion/  robot source used by the Streamlit interface
 tests/
 docs/                deploy guides · airbyte-oss.md · loom-script.md
-Dockerfile.api       API image (Render)    render.yaml   Render blueprint
+Dockerfile.api       API image (Railway)   railway.json  Railway settings   render.yaml  older Render blueprint
 Dockerfile           Streamlit image       docker-compose.yml   full stack on one server
 ```
