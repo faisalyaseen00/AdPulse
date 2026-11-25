@@ -118,7 +118,7 @@ if w["flagged"]:
                   "Job seekers, freebie hunters and people looking for store hours.",
                   ui.money(w["wasted_spend"]), f"wasted in {window} days"))
 
-ui.section("What to do next", f"based on the last {window} days")
+ui.section("Next steps", f"based on the last {window} days")
 if items:
     ui.todo(items)
     b1, b2, _ = st.columns([1, 1, 2])
@@ -128,7 +128,7 @@ else:
     st.success("Nothing needs your attention in this period.")
 
 # ---- From ad to customer --------------------------------------------------------------------------------
-ui.section("From ad to customer", f"last {window} days")
+ui.section("Customer journey", f"last {window} days")
 flow = [
     (plain.label("impressions"), f"{k.impressions:,.0f}", "times your ads were shown"),
     (plain.label("clicks"), f"{k.clicks:,.0f}",
@@ -157,7 +157,7 @@ with c1:
     dates = [pd.Timestamp(d) for d in wk.week]
     svg = ui.area_chart(dates, [("Sales from ads", wk.revenue.astype(float).tolist(), "#EB6834"),
                                 ("Ad spend", wk.spend.astype(float).tolist(), "#2A78D6")])
-    ui.chart_card("Sales and ad spend, last 6 months", "Each point is one week. Hover for the numbers.", svg,
+    ui.chart_card("Sales trend", "Last 6 months, one point per week. Hover for the numbers.", svg,
                   [("Sales from ads", "#EB6834", ui.money(wk.revenue.sum())),
                    ("Ad spend", "#2A78D6", ui.money(wk.spend.sum()))])
 with c2:
@@ -179,12 +179,12 @@ with c2:
         cheap, dear = m.iloc[0], m.iloc[-1]
         verdict = (f"{cheap.platform.title()} wins customers {ui.money(dear.cac - cheap.cac, 2)} cheaper "
                    f"than {dear.platform.title()}.")
-    ui.compare_card("Cost to win one customer", f"Last {window} days, lower is better",
+    ui.compare_card("Customer cost", f"Cost to win one customer, last {window} days. Lower is better.",
                     [(f"{r.platform.title()}, {int(r.customers):,} customers", r.cac, ui.money(r.cac, 2),
                       ui.PLATFORM_COLORS.get(r.platform, ui.INK)) for r in m.itertuples()], verdict)
 
 # ---- Every ad, judged -----------------------------------------------------------------------------------
-ui.section("How each ad is doing", f"last {window} days")
+ui.section("Ad performance", f"last {window} days")
 sc = econ
 
 

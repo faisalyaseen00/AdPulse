@@ -39,7 +39,7 @@ ui.kpi_row([
     ui.kpi("Safety", "Read-only", note="the AI can look at data, never change it"),
 ])
 
-ui.section("Last update from each source")
+ui.section("Freshness")
 if fresh.empty:
     st.info("No data loaded yet. Click **Load data now** below.")
 else:
@@ -49,7 +49,7 @@ else:
 st.caption("This demo uses sample data for a coffee brand. Connecting your real Meta, Google and Shopify "
            "accounts replaces it.")
 
-ui.section("Update the data")
+ui.section("Refresh")
 c1, c2 = st.columns(2)
 log_box = st.empty()
 

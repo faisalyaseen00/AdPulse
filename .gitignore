@@ -9,6 +9,17 @@ __pycache__/
 .DS_Store
 .claude/
 
+# --- JavaScript (web app in web/, robot source in frontend/companion/) ---
+node_modules/
+web/dist/
+frontend/companion/dist-demo/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+
+# --- Local deploy tooling ---
+.render/
+
 # --- Generated data ---
 data/
 *.csv.gz

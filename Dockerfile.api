@@ -1,0 +1,23 @@
+# AdPulse API: the FastAPI layer the React web app talks to (api/main.py).
+# Built by Render from render.yaml; also runs anywhere Docker does:
+#   docker build -f Dockerfile.api -t adpulse-api . && docker run --env-file .env -p 8000:8000 adpulse-api
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PORT=8000
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+# editable install keeps the package under /app, so PROJECT_ROOT (data/, .env) resolves to /app
+RUN pip install --upgrade pip && pip install -e ".[api]"
+
+COPY api ./api
+
+RUN useradd --create-home adpulse && mkdir -p /app/data && chown -R adpulse /app
+ENV DATA_DIR=/app/data
+USER adpulse
+
+EXPOSE 8000
+HEALTHCHECK CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", \"8000\")}/healthz')"
+# One worker on purpose: the API keeps a small in-memory cache and the refresh-job tracker in-process.
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

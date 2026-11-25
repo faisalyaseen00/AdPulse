@@ -14,23 +14,28 @@ from adpulse.config import get_settings
 # Chart palette (validated for colour-blind safety; order matters). Meta = blue, Google = orange.
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
 PLATFORM_COLORS = {"meta": SERIES[0], "google": SERIES[1], "unpaid": "#8a8f98"}
-INK, MUTED, GOOD, BAD, PULSE = "#14213D", "#5B6475", "#157A4A", "#C23B2E", "#F4B400"
+INK, MUTED, GOOD, BAD, PULSE = "#111318", "#5F6672", "#157A4A", "#C23B2E", "#F4B400"
 GOOD_SOFT, BAD_SOFT = "#E6F4EC", "#FBE9E7"
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,750&family=Figtree:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 :root {
-  --ink:#14213D; --ink-2:#2C3A57; --muted:#5B6475; --faint:#8A92A3; --line:#E3E6EC; --line-2:#EEF0F4;
+  --ink:#111318; --ink-2:#2B2F36; --muted:#5F6672; --faint:#8A92A3; --line:#E3E6EC; --line-2:#EEF0F4;
   --paper:#F7F8FA; --surface:#FFFFFF; --pulse:#F4B400; --pulse-soft:#FFF6D9;
   --good:#157A4A; --good-soft:#E6F4EC; --bad:#C23B2E; --bad-soft:#FBE9E7; --info-soft:#EAF0FB;
-  --display:'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
-  --body:'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --body:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
-html, body, .stApp, .stMarkdown p, .stMarkdown li, button, input, textarea, label { font-family: var(--body); }
+html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp [data-testid="stMarkdownContainer"],
+.stApp [data-baseweb] { font-family: var(--body); }
+.stApp [data-testid="stIconMaterial"], .stApp [class*="material-symbols"] { font-family: "Material Symbols Rounded" !important; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 code, pre, .stCode * { font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; }
 .stApp { background: var(--paper); color: var(--ink); }
-.block-container { padding-top: 3.2rem; padding-bottom: 4rem; max-width: 1240px; }
+.block-container { padding-top: 1.2rem; padding-bottom: 4rem; padding-left: 2.6rem; padding-right: 2.6rem;
+  max-width: 1560px; }
 h1, h2, h3, h4 { font-family: var(--display); color: var(--ink); letter-spacing: -0.01em; }
 .stMarkdown p, .stMarkdown li { font-size: 1rem; line-height: 1.6; color: var(--ink-2); }
 #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; height: 0; }
@@ -45,17 +50,50 @@ header[data-testid="stHeader"] button, header[data-testid="stHeader"] a,
 :focus-visible { outline: 2px solid var(--pulse) !important; outline-offset: 2px; }
 
 /* Sidebar */
-[data-testid="stSidebar"] { background: var(--surface); border-right: 1px solid var(--line); }
+[data-testid="stSidebar"] { border-right: none;
+  background: radial-gradient(420px 260px at 0% 100%, rgba(24,169,153,.14), transparent 70%),
+              linear-gradient(180deg, #0E1730 0%, #14213D 100%); }
+[data-testid="stSidebar"] * { color: #C9D2E3; }
+[data-testid="stSidebar"] [data-testid="stNavSectionHeader"], [data-testid="stSidebar"] [data-testid="stNavSectionHeader"] * {
+  color: #7F8BA3 !important; font-size: .78rem; font-weight: 650; letter-spacing: .02em; }
+[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,.08); }
+/* sidebar name box: plain white with black text in every state (typing, focused, filled) */
+[data-testid="stSidebar"] [data-baseweb="input"], [data-testid="stSidebar"] [data-baseweb="base-input"],
+[data-testid="stSidebar"] [data-testid="stTextInputRootElement"] {
+  background: #FFFFFF !important; border: 1px solid #FFFFFF !important; border-radius: 10px !important; }
+[data-testid="stSidebar"] input, [data-testid="stSidebar"] input:focus {
+  background: #FFFFFF !important; color: #111318 !important; -webkit-text-fill-color: #111318 !important; caret-color: #111318; }
+[data-testid="stSidebar"] input::placeholder { color: #6B7280 !important; -webkit-text-fill-color: #6B7280 !important; }
+[data-testid="stSidebar"] [data-baseweb="input"]:focus-within { border-color: #F4B400 !important; box-shadow: 0 0 0 3px rgba(244,180,0,.35); }
+[data-testid="stSidebar"] [data-testid="InputInstructions"], [data-testid="stSidebar"] [data-testid="InputInstructions"] * {
+  color: #6B7280 !important; }
+[data-testid="stSidebar"] .stButton > button {
+  background: linear-gradient(135deg, #F4B400, #FFB84D) !important; border: none !important; color: #14213D !important;
+  font-weight: 700 !important; box-shadow: 0 6px 18px -6px rgba(244,180,0,.55); }
+[data-testid="stSidebar"] .stButton > button:hover { filter: brightness(1.05); transform: translateY(-1px); }
+[data-testid="stSidebar"] .stButton > button p, [data-testid="stSidebar"] .stButton > button span,
+[data-testid="stSidebar"] .stButton > button * { color: #14213D !important; }
 [data-testid="stSidebarHeader"] img, [data-testid="stLogo"] { height: 2.1rem !important; max-width: 100%; }
 [data-testid="stSidebarNav"] a { border-radius: 8px; margin: 1px 6px; }
-[data-testid="stSidebarNav"] a span { color: var(--ink-2) !important; font-size: .95rem; }
-[data-testid="stSidebarNav"] a[aria-current="page"] { background: var(--pulse-soft); box-shadow: inset 3px 0 0 var(--pulse); }
-[data-testid="stSidebarNav"] a[aria-current="page"] span { color: var(--ink) !important; font-weight: 650; }
-.ap-side-label { font-size: .82rem; font-weight: 650; color: var(--muted); margin: 12px 0 6px; }
+/* brand: mark + the AdPulse name, drawn with CSS so the name uses the app's own font */
+[data-testid="stSidebarNav"]::before { content: "AdPulse"; display: block; height: 40px; line-height: 40px;
+  margin: -46px 8px 26px; position: relative; z-index: 1; padding: 0 0 0 50px; font: 800 1.42rem/40px var(--body); letter-spacing: -0.025em; color: #FFFFFF;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E %3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E %3Cstop offset='0' stop-color='%23FFD15C'/%3E%3Cstop offset='1' stop-color='%23F08A24'/%3E%3C/linearGradient%3E%3C/defs%3E %3Crect x='1' y='1' width='38' height='38' rx='11' fill='url%28%23g%29'/%3E %3Crect x='10' y='22' width='5' height='9' rx='2.5' fill='%2314213D'/%3E %3Crect x='17.5' y='16' width='5' height='15' rx='2.5' fill='%2314213D'/%3E %3Crect x='25' y='10' width='5' height='21' rx='2.5' fill='%2314213D'/%3E %3C/svg%3E") no-repeat left center / 38px 38px; }
+[data-testid="stSidebarNav"] li { margin: 3px 0; }
+[data-testid="stSidebarNav"] a { padding: 10px 14px !important; margin: 0 8px !important; border-radius: 12px !important;
+  border: 1px solid transparent; transition: background .15s, border-color .15s, transform .15s; }
+[data-testid="stSidebarNav"] a span { color: #D5DCE8 !important; font-size: .98rem; font-weight: 500; }
+[data-testid="stSidebarNav"] a:hover { background: rgba(255,255,255,.10) !important; border-color: rgba(255,255,255,.18);
+  transform: translateX(2px); box-shadow: 0 6px 16px -8px rgba(0,0,0,.5); }
+[data-testid="stSidebarNav"] a:hover span, [data-testid="stSidebarNav"] a:hover [data-testid="stIconMaterial"] { color: #FFFFFF !important; }
+[data-testid="stSidebarNav"] a[aria-current="page"] { background: linear-gradient(135deg, rgba(244,180,0,.22), rgba(244,180,0,.10)) !important;
+  border-color: rgba(244,180,0,.45); box-shadow: inset 3px 0 0 var(--pulse); }
+[data-testid="stSidebarNav"] a[aria-current="page"] span { color: #FFFFFF !important; font-weight: 650; }
+.ap-side-label { font-size: .78rem; font-weight: 650; color: #7F8BA3 !important; margin: 14px 0 8px; letter-spacing: .02em; }
 .ap-status { display:flex; flex-direction:column; gap:7px; }
-.ap-status .row { display:flex; align-items:center; gap:9px; font-size:.88rem; color: var(--ink-2); }
+.ap-status .row { display:flex; align-items:center; gap:9px; font-size:.88rem; }
 .ap-status .dot { width:8px; height:8px; border-radius:50%; flex:none; background:#B6BCC8; }
-.ap-status .dot.good { background: var(--good); } .ap-status .dot.info { background: var(--ink); }
+.ap-status .dot.good { background: #3DDC97; box-shadow: 0 0 0 3px rgba(61,220,151,.15); } .ap-status .dot.info { background: var(--ink); }
 .ap-status .dot.warn { background: var(--pulse); } .ap-status .dot.bad { background: var(--bad); }
 
 /* ---- The stage: dark, glowing, dot-grid header (Overview hero + every page header) ---- */
@@ -69,9 +107,10 @@ header[data-testid="stHeader"] button, header[data-testid="stHeader"] a,
   -webkit-mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%);
           mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 75%, transparent 100%); }
 .ap-stage > *, .ap-head > * { position: relative; }
-.ap-head { border-radius: 20px; padding: 22px 28px 20px; margin: 0 0 1.4rem; }
-.ap-head h1 { font-size: 2rem; font-weight: 750; margin: 0; padding: 0; line-height: 1.15; color: #fff; }
-.ap-head p { color: #B8C2D6; font-size: 1.03rem; margin: .45rem 0 0; line-height: 1.5; max-width: 720px; }
+.ap-head { border-radius: 22px; padding: 40px 40px 34px; margin: 0 0 1.6rem; min-height: 176px;
+  display: flex; flex-direction: column; justify-content: center; }
+.ap-head h1 { font-size: 2.45rem; font-weight: 800; margin: 0; padding: 0; line-height: 1.1; color: #fff; letter-spacing: -0.025em; }
+.ap-head p { color: #C2CBDB; font-size: 1.08rem; margin: .6rem 0 0; line-height: 1.5; max-width: 720px; }
 
 .ap-stage { border-radius: 26px; padding: 34px 38px 30px; margin: 0 0 1.6rem;
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 34px; align-items: end; }
@@ -121,6 +160,69 @@ header[data-testid="stHeader"] button, header[data-testid="stHeader"] a,
 @media (prefers-reduced-motion: reduce) {
   .ap-spark .line { stroke-dashoffset: 0; } .ap-spark .area, .ap-spark .dot { opacity: 1; } .ap-spark .ping { display: none; }
 }
+
+/* ---- Top bar ---- */
+.st-key-topbar { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 8px; }
+.st-key-topbar .crumb { font-size: .95rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.st-key-topbar .crumb b { color: var(--ink); font-weight: 650; }
+.st-key-topbar .chip { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; font-size: .85rem; color: var(--ink-2); background: var(--surface);
+  white-space: nowrap; box-sizing: border-box; }
+.st-key-topbar .chip i { width: 7px; height: 7px; border-radius: 50%; background: #3DDC97; box-shadow: 0 0 0 3px rgba(61,220,151,.18); }
+.st-key-topbar .me { display: inline-flex; align-items: center; gap: 9px; height: 40px; box-sizing: border-box;
+  padding: 0 14px 0 4px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--surface); font-weight: 650; color: var(--ink); font-size: .92rem; white-space: nowrap; }
+.st-key-topbar .me .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: .82rem;
+  color: #fff; background: linear-gradient(135deg, #14213D, #2C3A57); box-shadow: inset 0 0 0 2px rgba(244,180,0,.6); }
+@media (max-width: 1180px) { .st-key-topbar .chip { display: none; } }
+.st-key-topbar_right > div, .st-key-topbar_right [data-testid="stElementContainer"] { width: auto !important; margin: 0; }
+.st-key-topbar [data-testid="stPageLink"] { display: flex; margin: 0; }
+.st-key-topbar [data-testid="stPageLink"] a { border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  height: 40px; box-sizing: border-box; padding: 0 12px; gap: 6px; width: fit-content; display: inline-flex;
+  align-items: center; margin: 0; }
+.st-key-topbar [data-testid="stPageLink"] a:hover { border-color: var(--ink); background: var(--surface); }
+.st-key-topbar [data-testid="stPageLink"] a p { font-weight: 700; color: #fff; background: var(--bad); border-radius: 999px;
+  padding: 0 7px; font-size: .75rem; line-height: 1.5rem; }
+.ap-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 4px 0 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.ap-top .crumb { font-size: .95rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.ap-top .crumb b { color: var(--ink); font-weight: 650; }
+.ap-top .right { display: flex; align-items: center; gap: 10px; }
+.ap-top .chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid var(--line);
+  border-radius: 999px; font-size: .85rem; color: var(--ink-2); background: var(--surface); }
+.ap-top .chip i { width: 7px; height: 7px; border-radius: 50%; background: #3DDC97; box-shadow: 0 0 0 3px rgba(61,220,151,.18); }
+.ap-top .bell { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--surface); display: grid; place-items: center; text-decoration: none; transition: border-color .15s; }
+.ap-top .bell:hover { border-color: var(--ink); }
+.ap-top .bell svg { width: 18px; height: 18px; }
+.ap-top .bell .n { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--bad); color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center;
+  border: 2px solid var(--paper); }
+.ap-top .me { display: inline-flex; align-items: center; gap: 9px; padding: 4px 14px 4px 4px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--surface); font-weight: 650; color: var(--ink); font-size: .92rem; }
+.ap-top .me .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: .82rem;
+  color: #fff; background: linear-gradient(135deg, #14213D, #2C3A57); box-shadow: inset 0 0 0 2px rgba(244,180,0,.6); }
+.ap-orn { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.ap-orn i { width: 34px; height: 1.5px; background: rgba(255,255,255,.35); }
+.ap-orn b { width: 7px; height: 7px; background: var(--pulse); transform: rotate(45deg); }
+/* ---- Floating 3D robot (opens the Ask page) ---- */
+.st-key-aic_robot { position: fixed !important; right: 22px; bottom: 58px; width: 124px; height: 140px; z-index: 999;
+  gap: 0 !important; animation: ap-rise .7s .6s both; }
+.st-key-aic_robot [data-testid="stElementContainer"] { position: absolute; inset: 0; margin: 0 !important; width: 124px !important; }
+.st-key-aic_robot iframe { width: 124px !important; height: 140px !important; border: 0; background: transparent;
+  pointer-events: none; color-scheme: normal; transition: transform .25s cubic-bezier(.2,.7,.2,1); }
+.st-key-aic_robot:hover iframe { transform: translateY(-4px) scale(1.04); }
+.st-key-aic_robot [data-testid="stPageLink"] { position: absolute; inset: 0; z-index: 2; }
+.st-key-aic_robot [data-testid="stPageLink"] a { width: 124px; height: 140px; border-radius: 28px; background: transparent !important;
+  padding: 0; }
+.st-key-aic_robot [data-testid="stPageLink"] a * { opacity: 0; }   /* label kept for screen readers, hidden visually */
+.st-key-aic_robot [data-testid="stPageLink"] a:focus-visible { outline: 3px solid var(--pulse); }
+.aic-bubble { position: absolute; right: 118px; bottom: 74px; white-space: nowrap; padding: 9px 14px;
+  border-radius: 14px 14px 4px 14px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 12px 30px -12px rgba(16,24,40,.35); line-height: 1.25; pointer-events: none;
+  opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
+.aic-bubble b { display: block; font-size: .92rem; color: var(--ink); } .aic-bubble span { font-size: .78rem; color: var(--muted); }
+.st-key-aic_robot:hover .aic-bubble { opacity: 1; transform: none; }
 
 /* Section header */
 .ap-section { display:flex; align-items:baseline; gap:12px; flex-wrap: wrap; margin: 2rem 0 .7rem; }
@@ -185,10 +287,11 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 .stButton > button[kind="secondary"]:hover { border-color: var(--ink); color: var(--ink); }
 .stButton > button p { white-space: normal; text-align: left; }
 [data-testid="stDataFrame"], [data-testid="stDataEditor"] { border:1px solid var(--line); border-radius: 12px; overflow:hidden; background: var(--surface); }
-.stTabs [data-baseweb="tab-list"] { gap: 6px; border-bottom: 1px solid var(--line); }
-.stTabs [data-baseweb="tab"] { padding: 8px 4px; font-weight: 600; }
-.stTabs [aria-selected="true"] { color: var(--ink); }
-.stTabs [data-baseweb="tab-highlight"] { background: var(--pulse); height: 3px; }
+.stTabs [data-baseweb="tab-list"] { gap: 4px; background: #EEF0F4; padding: 5px; border-radius: 14px; width: fit-content;
+  border-bottom: none; }
+.stTabs [data-baseweb="tab"] { padding: 8px 18px; font-weight: 600; border-radius: 10px; color: var(--muted); height: auto; }
+.stTabs [aria-selected="true"] { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none; }
 [data-testid="stPlotlyChart"] { background: var(--surface); border:1px solid var(--line); border-radius: 14px; padding: 10px 12px 4px; }
 [data-testid="stChatMessage"] { background: var(--surface); border:1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
 [data-testid="stAlert"] { border-radius: 12px; }
@@ -198,7 +301,7 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 .ap-impact .n { font-family: var(--display); font-weight: 750; font-size: 1.7rem; color: var(--ink);
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .ap-impact .c { font-size: .82rem; color: var(--muted); }
-[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: .8rem; line-height: 1.45; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: .8rem; line-height: 1.45; color: #7F8BA3 !important; }
 /* Bordered containers = control bars and cards: white, rounded, aligned */
 /* panels: st.container(border=True, key="panel_...") get a white card look */
 [class*="st-key-panel_"] { background: var(--surface); border-radius: 16px !important; border-color: var(--line) !important; }
@@ -244,8 +347,8 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 .ap-chart .lg b { font-variant-numeric: tabular-nums; }
 .ap-area { width: 100%; height: auto; display: block; overflow: visible; }
 .ap-area .g { stroke: #EEF0F4; stroke-width: 1; }
-.ap-area .yl { font: 500 13px Figtree, sans-serif; fill: #8A92A3; text-anchor: end; }
-.ap-area .xl { font: 500 13px Figtree, sans-serif; fill: #8A92A3; text-anchor: start; }
+.ap-area .yl { font: 500 13px Inter, sans-serif; fill: #6B7280; text-anchor: end; }
+.ap-area .xl { font: 500 13px Inter, sans-serif; fill: #6B7280; text-anchor: start; }
 .ap-area .ln { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ap-draw 1.9s .2s cubic-bezier(.45,0,.2,1) forwards; }
 .ap-area .ln.l1 { animation-delay: .45s; }
 .ap-area .fillp { opacity: 0; animation: ap-fade 1s 1.2s ease forwards; }
@@ -287,7 +390,10 @@ div[data-testid="stExpander"] details { border-radius: 12px; border-color: var(-
 @media (max-width: 900px) { .ap-how { grid-template-columns: 1fr 1fr; } .ap-how .st:nth-child(2) { border-right: none; } }
 @media (max-width: 640px) {
   .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 3.6rem; }
-  .ap-head { padding: 20px 18px; border-radius: 16px; } .ap-head h1 { font-size: 1.55rem; }
+  .ap-top .chip { display: none; }
+  .st-key-aic_robot { right: 6px; bottom: 8px; transform: scale(.72); transform-origin: bottom right; }
+  .aic-bubble { display: none; }
+  .ap-head { padding: 24px 20px; border-radius: 16px; min-height: 120px; } .ap-head h1 { font-size: 1.75rem; }
   .ap-todo .t { grid-template-columns: 6px 1fr; } .ap-todo .n { grid-column: 2; text-align: left; min-width: 0; }
   .ap-gloss { grid-template-columns: 1fr; }
   .ap-impact { text-align: left; }
@@ -301,7 +407,63 @@ def inject_css() -> None:
 
 def hero(title: str, subtitle: str = "", icon: str = "") -> None:
     st.html(f'<div class="ap-head"><h1>{html.escape(title)}</h1>'
-            + (f"<p>{html.escape(subtitle)}</p>" if subtitle else "") + "</div>")
+            + (f"<p>{html.escape(subtitle)}</p>" if subtitle else "")
+            + '<div class="ap-orn"><i></i><b></b><i></i></div></div>')
+
+
+BELL = ('<svg viewBox="0 0 24 24" fill="none" stroke="#14213D" stroke-width="1.8" stroke-linecap="round" '
+        'stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>'
+        '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>')
+
+
+def topbar(section: str, page: str, data_until: str, user: str) -> None:
+    """Breadcrumb on the left; data freshness and the user chip on the right."""
+    initials = "".join(w[0] for w in (user or "Guest").split()[:2]).upper()
+    chip = f'<span class="chip"><i></i>Data up to {html.escape(data_until)}</span>' if data_until else ""
+    with st.container(key="topbar"):
+        left, right = st.columns([1, 1.6], vertical_alignment="center")
+        left.html(f'<div class="crumb"><span>{html.escape(section)}</span><span>/</span>'
+                  f'<b>{html.escape(page)}</b></div>')
+        # one right-aligned row: data chip, user. Same height, even gaps.
+        with right.container(horizontal=True, horizontal_alignment="right", vertical_alignment="center",
+                             gap="small", wrap=False, key="topbar_right"):
+            if chip:
+                st.html(chip, width="content")
+            st.html(f'<span class="me"><span class="av">{html.escape(initials)}</span>'
+                    f'{html.escape(user or "Guest")}</span>', width="content")
+
+
+def robot_icon() -> None:
+    """The floating 3D robot (bottom-right) that opens the Ask page.
+    The robot renders in a small transparent frame from app/static/companion (built from frontend/companion);
+    an in-app page link sits on top of it, so clicking switches pages without a reload."""
+    import streamlit.components.v1 as components
+
+    static = Path(__file__).parent / "static" / "companion"
+    try:  # cache-buster: a new build gets a new URL, so browsers never run a stale bundle
+        version = int((static / "robot.js").stat().st_mtime)
+    except OSError:
+        version = 0
+    # Shown instantly and kept if 3D can't load: a small 2D robot (React replaces it once the 3D scene is ready).
+    poster = ('<svg viewBox="0 0 96 96" width="92" height="92" style="position:absolute;left:50%;bottom:4px;'
+              'transform:translateX(-50%)" aria-hidden="true"><ellipse cx="48" cy="90" rx="22" ry="3" fill="#0B1226" '
+              'opacity=".18"/><rect x="28" y="58" width="40" height="28" rx="14" fill="#EEF2F7" stroke="#C7D0DC"/>'
+              '<line x1="48" y1="14" x2="48" y2="22" stroke="#B9C3D1" stroke-width="3" stroke-linecap="round"/>'
+              '<circle cx="48" cy="12" r="4" fill="#22D3EE"/><rect x="18" y="20" width="60" height="42" rx="21" '
+              'fill="#F4F6FA" stroke="#C7D0DC"/><rect x="26" y="28" width="44" height="26" rx="13" fill="#0B1426"/>'
+              '<ellipse cx="39" cy="40" rx="4" ry="5" fill="#22D3EE"/><ellipse cx="57" cy="40" rx="4" ry="5" '
+              'fill="#22D3EE"/><path d="M42 48 Q48 51 54 48" fill="none" stroke="#22D3EE" stroke-width="2" '
+              'stroke-linecap="round"/></svg>')
+    with st.container(key="aic_robot"):
+        st.html('<div class="aic-bubble"><b>Ask AdPulse</b><span>Questions about your ads?</span></div>')
+        components.html(
+            '<style>html,body{margin:0;background:transparent;overflow:hidden}</style>'
+            f'<div id="root" data-model="/app/static/companion/robot.glb?v={version}" '
+            f'style="position:fixed;inset:0">{poster}</div>'
+            f'<script type="module" src="/app/static/companion/robot.js?v={version}"></script>',
+            height=140,
+        )
+        st.page_link("views/ask.py", label="Ask AdPulse", help="Ask a question about your ads")
 
 
 def sparkline(values: list[float], compare: list[float] | None = None, w: int = 600, h: int = 190) -> str:
@@ -494,7 +656,7 @@ def card_list(title: str, dot: str, rows: list[tuple[str, str, str, str]]) -> No
                 f'<div class="m">{html.escape(m)}</div></div>' for n, x, tone, m in rows) + "</div>")
 
 
-def glossary(keys: list[str], title: str = "What do these words mean?") -> None:
+def glossary(keys: list[str], title: str = "Glossary") -> None:
     from adpulse import plain
     with st.expander(title):
         st.html('<dl class="ap-gloss">' + "".join(
@@ -568,11 +730,11 @@ def kpi_row(tiles: list[str]) -> None:
 def style_fig(fig: go.Figure, height: int = 320, money_axis: bool = False) -> go.Figure:
     fig.update_layout(
         height=height, margin={"l": 8, "r": 8, "t": 64, "b": 8}, paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)", font={"family": "Figtree, system-ui, sans-serif", "size": 13, "color": "#2C3A57"},
+        plot_bgcolor="rgba(0,0,0,0)", font={"family": "Inter, system-ui, sans-serif", "size": 13, "color": "#2B2F36"},
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.01, "xanchor": "left", "x": 0, "title": None,
                 "font": {"size": 13}},
         hoverlabel={"bgcolor": "white", "font_size": 13, "bordercolor": "#E3E6EC"}, bargap=0.35,
-        title={"font": {"family": "Bricolage Grotesque, Figtree, sans-serif", "size": 17, "color": INK},
+        title={"font": {"family": "Inter, sans-serif", "size": 17, "color": INK},
                "x": 0.01, "xanchor": "left", "y": 0.97, "yanchor": "top"},
     )
     fig.update_xaxes(showgrid=False, linecolor="#E3E6EC", tickcolor="#E3E6EC")

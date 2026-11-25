@@ -68,7 +68,7 @@ if send_slack or send_mail:
             st.error(f"Couldn't send to {where}. {r.removeprefix('error: ')}", icon="⚠️")
 
 # ---- The report ---------------------------------------------------------------------------------------------
-ui.section(f"{rep.period_start:%B %-d} to {rep.period_end:%B %-d}", "compared with the week before")
+ui.section("This week", f"{rep.period_start:%B %-d} to {rep.period_end:%B %-d}, compared with the week before")
 SHORT = {plain.label("new_customers"): "New customers", plain.label("cac"): "Cost per customer"}
 ui.kpi_row([ui.kpi(SHORT.get(k.label, k.label), k.text(), k.change, k.better, period="week before")
             for k in rep.kpis])
@@ -87,13 +87,13 @@ def ad_rows(df: pd.DataFrame) -> list[tuple[str, str, str, str]]:
 
 left, right = st.columns(2, gap="medium")
 with left, st.container(border=True, key="panel_scale"):
-    ui.card_list("Ads worth more budget", "#157A4A", ad_rows(rep.top_ads))
+    ui.card_list("Top ads", "#157A4A", ad_rows(rep.top_ads))
 with right, st.container(border=True, key="panel_pause"):
-    ui.card_list("Ads losing money", "#C23B2E", ad_rows(rep.worst_ads))
+    ui.card_list("Losing ads", "#C23B2E", ad_rows(rep.worst_ads))
 
 with st.container(border=True, key="panel_waste"):
     w1, w2 = st.columns([1, 1.6], gap="large", vertical_alignment="center")
-    w1.html('<div class="ap-card-h">Wasted Google searches</div>'
+    w1.html('<div class="ap-card-h">Wasted searches</div>'
             f'<div class="ap-big bad">{ui.money(rep.waste["wasted_spend"])}</div>'
             f'<div class="ap-sub">on {rep.waste["flagged"]} searches, {rep.waste["wasted_share"]:.0%} of search '
             'spend this week</div>')
@@ -104,7 +104,7 @@ with st.container(border=True, key="panel_waste"):
 st.caption(f"{len(rep.pending)} suggestion(s) are waiting for approval. Nothing changes until someone approves.")
 
 # ---- History ------------------------------------------------------------------------------------------------
-ui.section("Reports sent before")
+ui.section("History")
 h = weekly.history()
 if h.empty:
     st.caption("No reports sent yet.")

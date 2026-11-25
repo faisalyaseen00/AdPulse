@@ -160,7 +160,7 @@ if not chat:
             ("3", "A second check", "Another pass reviews the logic before you see anything."),
             ("4", "Every number verified", "Each figure in the answer is matched to your real data."),
         ]) + "</div>")
-    ui.section("Try a question")
+    ui.section("Examples")
     for i in range(0, len(SUGGESTIONS), 2):
         cols = st.columns(2)
         for col, s in zip(cols, SUGGESTIONS[i:i + 2]):

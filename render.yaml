@@ -1,0 +1,53 @@
+# Render Blueprint for the AdPulse API (https://render.com/docs/blueprint-spec).
+# In Render: New + > Blueprint > pick this repository. Render asks for every `sync: false` value once;
+# paste them in the dashboard (never commit them).
+services:
+  - type: web
+    name: adpulse-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    plan: free               # free: sleeps after 15 minutes idle; the next visit takes about a minute to wake it
+    region: frankfurt        # close to a European ClickHouse Cloud region; pick the one nearest your database
+    healthCheckPath: /healthz
+    autoDeploy: true
+    buildFilter:
+      paths: ["api/**", "src/**", "pyproject.toml", "Dockerfile.api"]
+    envVars:
+      # --- ClickHouse Cloud (the same values the Streamlit app and the weekly report use) ---
+      - key: CLICKHOUSE_HOST
+        sync: false
+      - key: CLICKHOUSE_PORT
+        value: "8443"
+      - key: CLICKHOUSE_SECURE
+        value: "true"
+      - key: CLICKHOUSE_DATABASE
+        value: adpulse
+      - key: CLICKHOUSE_USER
+        sync: false
+      - key: CLICKHOUSE_PASSWORD
+        sync: false
+      - key: CLICKHOUSE_READER_USER
+        sync: false
+      - key: CLICKHOUSE_READER_PASSWORD
+        sync: false
+      # --- AI assistant ---
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      # --- Weekly report delivery (optional) ---
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_CHANNEL
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: REPORT_TIMEZONE
+        value: Asia/Karachi
+      # --- Who may call the API from a browser ---
+      # your production web address, e.g. https://adpulse.vercel.app (comma-separate several)
+      - key: ADPULSE_CORS_ORIGINS
+        sync: false

@@ -1,6 +1,19 @@
-.venv
+# keep Docker build contexts small: only Python sources are needed in the images
 .git
-data
-.env
+.github
+.claude
+.venv
+.venv-*
 __pycache__
 .pytest_cache
+.ruff_cache
+data
+.env
+.env.*
+!.env.example
+*secrets*.toml
+node_modules
+web
+frontend
+docs
+tests

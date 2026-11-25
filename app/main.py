@@ -59,8 +59,6 @@ pages = {
 }
 nav = st.navigation(pages)
 
-ASSETS = Path(__file__).parent / "assets"
-st.logo(str(ASSETS / "logo.svg"), size="large", icon_image=str(ASSETS / "icon.svg"))
 
 with st.sidebar:
     h = ui.health()
@@ -91,5 +89,17 @@ with st.sidebar:
     st.text_input("Your name", key="reviewer", placeholder="Needed to approve suggestions",
                   label_visibility="collapsed", help="Saved with every approve or reject, so the team knows who decided.")
     st.caption("Nothing changes in your ad accounts until a person approves it.")
+
+# ---- Top bar on every page: where you are, data freshness, who you are ----------------
+section = next((g for g, ps in pages.items() if any(p.title == nav.title for p in ps)), "")
+until = ""
+if h.ok:
+    try:
+        until = f"{ui.q('SELECT max(date) AS d FROM fct_ad_daily').iloc[0]['d']:%b %-d}"
+    except Exception:  # noqa: BLE001, S110  (empty warehouse: the page itself explains)
+        pass
+ui.topbar(section, nav.title, until, ui.reviewer())
+if nav.title != "Ask a question":
+    ui.robot_icon()
 
 nav.run()

@@ -60,11 +60,11 @@ with left, st.container(border=True, key="panel_waste"):
     if not flagged.empty:
         camp = flagged.groupby("campaign_name", as_index=False)["wasted_spend"].sum().sort_values(
             "wasted_spend", ascending=False)
-        st.html('<div class="ap-card-h" style="margin-top:22px">Which campaigns</div>')
+        st.html('<div class="ap-card-h" style="margin-top:22px">Campaigns</div>')
         ui.bars([(r.campaign_name, r.wasted_spend, ui.money(r.wasted_spend)) for r in camp.itertuples()],
                 color="linear-gradient(90deg,#2a78d6,#14213D)")
 with right, st.container(border=True, key="panel_why"):
-    st.html('<div class="ap-card-h">Why they won\'t buy</div>')
+    st.html('<div class="ap-card-h">Reasons</div>')
     if flagged.empty:
         st.caption("Nothing to block in this period.")
     else:
@@ -73,7 +73,7 @@ with right, st.container(border=True, key="panel_why"):
         ui.bars([(r.reason, r.wasted_spend, ui.money(r.wasted_spend)) for r in why.itertuples()])
 
 # ---- Pick what to block -----------------------------------------------------------------------------------
-ui.section("Searches to block", "untick any you want to keep")
+ui.section("Block list", "untick any you want to keep")
 if flagged.empty:
     st.success("No wasted searches in this period.")
 else:

@@ -16,9 +16,16 @@ with st.container(border=True, key="panel_controls"):
     top = st.columns([1.2, 1.2, 1.8], vertical_alignment="bottom")
     window = top[0].selectbox("Look at", [14, 30, 60], index=1, format_func=lambda d: f"The last {d} days")
     check = top[1].button("Check my ads for new ideas", type="primary", width="stretch", icon=":material/autorenew:")
-    top[2].html('<div style="min-height:40px;display:flex;align-items:center">'
-                + (ui.badge(f"Deciding as {who}", "good") if who else
-                   ui.badge("Type your name in the sidebar to approve or reject", "warn")) + "</div>")
+    if who:
+        top[2].html('<div style="min-height:40px;display:flex;align-items:center">'
+                    + ui.badge(f"Deciding as {who}", "good") + "</div>")
+    else:
+        # approvals record who decided, so a name is required; ask for it right here, not only in the sidebar
+        def _use_name():
+            st.session_state["reviewer"] = st.session_state.get("reviewer_here", "").strip()
+        top[2].text_input("Your name (needed to approve)", key="reviewer_here", placeholder="e.g. Faisal",
+                          on_change=_use_name, help="Saved with every approve or reject, so the team knows who "
+                                                    "decided. Press Enter to confirm.")
 if check:
     found = recs.rule_recommendations(window)
     n = recs.save(found)

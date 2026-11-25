@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * AdPulse editorial design system.
+ * Paper, ink and one marigold accent (from the mark). Newsreader for headlines and headline figures,
+ * Geist for interface text and tables. 6px corners, hairline rules, no blur, no gradients.
+ */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --shadow-card: 0 1px 0 rgb(22 24 29 / 0.04);
+
+  --color-paper: #f4f4f1;
+  --color-canvas: #ecece7;
+  --color-surface: #ffffff;
+  --color-line: #e2e2dc;
+  --color-line-strong: #c8c9c2;
+  --color-ink: #16181d;
+  --color-ink-2: #33363d;
+  --color-muted: #4a4e56;
+  --color-faint: #676b73;
+  --color-navy: #16181d;
+  --color-navy-soft: #ecece7;
+  --color-on-navy: #ffffff;
+  --color-midnight: #16181d;
+  --color-raised: #ffffff;
+  --color-saffron: #d4920f;
+  --color-saffron-soft: #f6ead0;
+  --color-marigold-ink: #8a5a00;
+  --color-good: #1e7a4e;
+  --color-good-soft: #e3f1e8;
+  --color-bad: #b3261e;
+  --color-bad-soft: #f8e4e1;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #f6ead0;
+  --color-meta: #2e4a86;
+  --color-google: #6b7a3a;
+}
+
+html, body, #app { min-height: 100%; }
+/* nothing may make the page wider than the window (it would shift the centred layout) */
+html, body { overflow-x: clip; }
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  h1, h2 { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.015em; }
+  h3 { font-weight: 600; }
+  ::selection { background: var(--color-saffron-soft); }
+  :focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; border-radius: 4px; }
+}
+
+/* section label: plain sentence-case text at reading size */
+.kicker { font-size: 1rem; font-weight: 500; color: var(--color-ink-2); }
+
+/* markdown answers from the assistant */
+.prose-ap ul { list-style: disc; padding-left: 1.2rem; display: grid; gap: .45rem; }
+.prose-ap p { margin: .4rem 0; }
+.prose-ap strong { font-weight: 600; color: var(--color-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* 2D robot fallback (no WebGL) */
+.aic-fallback { display: block; overflow: visible; }
+.aic-fb-body { animation: aic-float 3.2s ease-in-out infinite; transform-box: fill-box; }
+.aic-fb-eye { transform-box: fill-box; transform-origin: center; animation: aic-blink 4.4s infinite; }
+@keyframes aic-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes aic-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+
+@layer components {
+/* product tables: bordered surface, tinted header row, generous rows, numbers right-aligned by the page */
+.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .97rem; }
+.data-table thead th {
+  background: var(--color-canvas); color: var(--color-ink-2); font-weight: 600; font-size: .86rem;
+  text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--color-line-strong); white-space: nowrap;
+}
+.data-table tbody td { padding: .95rem 1rem; border-bottom: 1px solid var(--color-line); vertical-align: top; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover td { background: #fbfbf9; }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table-frame { overflow-x: auto; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface); }
+}
