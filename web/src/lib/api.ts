@@ -1,5 +1,7 @@
 /** Thin client for the AdPulse Python API (api/main.py). */
-const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+// Accepts "https://api.example.com", "https://api.example.com/" or a bare "api.example.com" (https is added).
+const RAW = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").trim().replace(/\/+$/, "");
+const BASE = RAW && !/^https?:\/\//i.test(RAW) ? `https://${RAW}` : RAW;
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -24,6 +26,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       detail = typeof body.detail === "string" ? body.detail : detail;
     } catch { /* not JSON */ }
     throw new ApiError(detail || "Something went wrong", res.status);
+  }
+  // A web page instead of data means the request never reached the API (usually VITE_API_URL was not set
+  // when the site was built, so the host served the app's own index.html).
+  if (!(res.headers.get("content-type") ?? "").includes("json")) {
+    throw new ApiError(
+      BASE
+        ? `The address ${BASE} did not answer like the AdPulse server. Check VITE_API_URL.`
+        : "The AdPulse server address is not set. Add VITE_API_URL on Vercel and redeploy.",
+      res.status,
+    );
   }
   return res.json() as Promise<T>;
 }
